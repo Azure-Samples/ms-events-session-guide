@@ -81,6 +81,8 @@ Repository: [Azure-Samples/ms-ignite-2026-session-guide](https://github.com/Azur
 
 The workflow installs pinned Hugo, runs the dependency-free Node tests, builds the site, and uploads/deploys `public/`. Pull requests build and run tests without deploying. The deployment base URL comes from GitHub Pages, so repository subpaths and configured custom domains are respected. No hardcoded repository name or client-side routing fallback is needed.
 
+All remote actions are pinned to full-length commit SHAs, with release versions in comments. Pages packaging is performed directly to avoid mutable action references nested inside a composite uploader. `npm test` rejects unpinned remote action references; update SHA pins deliberately when updating action versions.
+
 To preview a production build:
 
 ```sh
