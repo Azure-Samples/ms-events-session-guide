@@ -426,3 +426,14 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Hugo site output and local development artifacts
+/public/
+/resources/
+/.hugo_build.lock
+/.DS_Store
+/test-results/
+/.playwright-mcp/
+
+# Unused local speaker export; the app uses 2026_ignite_session_catalog.json
+/ignite_sessions.json
