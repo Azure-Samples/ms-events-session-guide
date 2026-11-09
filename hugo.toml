@@ -1,0 +1,12 @@
+baseURL = "https://example.org/"
+languageCode = "en-us"
+title = "Ignite Field Guide | Startups & Digital Natives"
+disableKinds = ["taxonomy", "term", "RSS", "sitemap"]
+enableRobotsTXT = true
+
+[params]
+description = "Your opinionated Microsoft Ignite 2026 session guide. Find what matters, understand why, and build a learning path for your next stage of growth."
+catalogFile = "2026_ignite_session_catalog.json"
+
+[build]
+writeStats = false

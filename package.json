@@ -1,0 +1,10 @@
+{
+  "name": "ignite-field-guide",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build": "hugo --gc --minify",
+    "dev": "hugo server --bind 127.0.0.1 --disableFastRender"
+  }
+}
