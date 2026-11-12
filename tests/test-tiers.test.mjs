@@ -55,6 +55,7 @@ test("PR gate combines code regressions with smoke, not the full browser matrix"
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   assert.equal(pkg.scripts["test:pr"], "npm test && npm run test:e2e:smoke");
   const workflow = await readFile(new URL("../.github/workflows/pages.yml", import.meta.url), "utf8");
+  assert.match(workflow, /build:\n\s+runs-on: ubuntu-24\.04/);
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /run: npm test/);
   assert.match(workflow, /run: npm run test:e2e:smoke/);
@@ -64,6 +65,7 @@ test("PR gate combines code regressions with smoke, not the full browser matrix"
 
 test("full matrix remains scheduled and manually runnable without deployment privileges", async () => {
   const workflow = await readFile(new URL("../.github/workflows/e2e.yml", import.meta.url), "utf8");
+  assert.match(workflow, /regression:\n\s+runs-on: ubuntu-24\.04/);
   assert.match(workflow, /schedule:\n\s+- cron: "0 9 \* \* \*"/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /run: npm run test:e2e:full/);
