@@ -17,7 +17,8 @@ The end-user Playwright test specification lives in
 under `tests/e2e/reviews/`. Runnable tests accompany the specification.
 `npm run test:pr` combines direct-code regressions with critical Chromium
 journeys; `npm run test:e2e:full` runs the full desktop/mobile browser matrix.
-GitHub Actions uses the fast gate for PRs and full coverage nightly or manually.
+GitHub Actions uses the fast gate for PRs and full coverage only on demand,
+before merge or release; there is no recurring schedule.
 Calendar downloads are checked independently; actual calendar-client imports
 remain blocked pending authorized client access.
 

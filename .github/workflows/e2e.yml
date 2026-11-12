@@ -1,8 +1,6 @@
 name: Full browser regression
 
 on:
-  schedule:
-    - cron: "0 9 * * *"
   workflow_dispatch:
 
 permissions:

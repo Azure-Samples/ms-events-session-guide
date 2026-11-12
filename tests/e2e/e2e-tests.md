@@ -19,7 +19,8 @@ the full suite, not a second simplified implementation.
 The full matrix remains `npm run test:e2e:full` (or `npm run test:e2e`), after
 `npx playwright install chromium firefox webkit`. Hugo 0.159.1+ and Node.js 22+
 are prerequisites. GitHub Actions runs code regressions and smoke for PRs/main
-pushes, and the full matrix daily at 09:00 UTC or by manual workflow dispatch.
+pushes, and the full matrix only by manual workflow dispatch before merge or
+release. There is no recurring schedule.
 The runner
 builds fixture sites and owns `127.0.0.1:1414` for the run, without reusing a
 possibly stale server. `npm run test:e2e:chromium` runs only desktop Chromium.

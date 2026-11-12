@@ -41,12 +41,12 @@ npm run test:pr
 | `npm run test:e2e:smoke` | 12 tagged critical Chromium journeys: Save/reload/repeats, event isolation, guide/share/download, navigation, and recovery. | Every PR. |
 | `npm run test:pr` | Both fast gates above. | Local pre-PR check. |
 | `npm run test:e2e:chromium` | Broader single-engine browser regression. | Relevant UI changes/debugging. |
-| `npm run test:e2e:full` | Full desktop/mobile Chromium, Firefox, and WebKit matrix (also `npm run test:e2e`). | Nightly, manual/pre-release. |
+| `npm run test:e2e:full` | Full desktop/mobile Chromium, Firefox, and WebKit matrix (also `npm run test:e2e`). | On demand before merge or release. |
 
 For the full matrix, first run `npx playwright install chromium firefox webkit`.
 GitHub Actions runs code regressions plus smoke on PRs and main pushes; the full
-workflow runs daily at 09:00 UTC and through manual dispatch. The workflows become
-active once these changes are merged.
+workflow runs only through manual dispatch, for example before merge or release.
+There is no recurring schedule.
 
 The runner builds isolated, telemetry-free fixtures and owns `127.0.0.1:1414`;
 leave that port free and run browser tiers sequentially. Smoke builds only the
