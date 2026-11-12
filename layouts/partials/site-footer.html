@@ -1,6 +1,6 @@
 {{- /* Shared footer. Context: dict "backToTop" (bool). */ -}}
 <footer class="site-footer container">
-  <a class="brand footer-brand" href="{{ site.Home.RelPermalink }}">events <span class="brand-divider">/</span> guide</a>
+  {{ partial "devex-brand.html" . }}
   <p>For the teams building what comes next. An independent guide; not official event guidance.</p>
   <div class="footer-actions">
     {{- $notices := resources.FromString "third-party-notices.txt" (os.ReadFile "NOTICE") }}

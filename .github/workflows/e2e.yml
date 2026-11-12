@@ -1,0 +1,67 @@
+name: Full browser regression
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-full-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HUGO_VERSION: "0.159.1"
+  HUGO_TELEMETRY_ENABLED: "false"
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Install pinned dependencies
+        run: npm ci
+
+      - name: Install pinned Hugo
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP"
+          curl --fail --silent --show-error --location --output "hugo_${HUGO_VERSION}_linux-amd64.tar.gz" \
+            "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_linux-amd64.tar.gz"
+          curl --fail --silent --show-error --location --output hugo_checksums.txt \
+            "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing hugo_checksums.txt
+          mkdir -p "$RUNNER_TEMP/hugo-bin"
+          tar -xzf "hugo_${HUGO_VERSION}_linux-amd64.tar.gz" -C "$RUNNER_TEMP/hugo-bin" hugo
+          echo "$RUNNER_TEMP/hugo-bin" >> "$GITHUB_PATH"
+
+      - name: Run code-level unit and regression tests
+        run: npm test
+
+      - name: Install cross-browser engines
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Run full desktop and mobile browser regression
+        id: browsers
+        run: npm run test:e2e:full
+
+      - name: Retain full reports and browser evidence
+        if: always() && steps.browsers.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-full-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: error

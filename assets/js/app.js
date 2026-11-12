@@ -11,7 +11,7 @@ import { GUIDE_LIMITS, snapshotSession, validateGuide, decodeGuide, createShareU
 import { LEGACY_EVENT, LEGACY_EVENT_ID } from "./event-context.js";
 import { eventStorageKeys, migrateLegacyStorage, withEventStorageLock, validateStoredDraft } from "./event-state.js";
 import { initializeTelemetry } from "./telemetry.js";
-import { preserveThemeForSiteLinks, validateManifest, wireEventLinks } from "./events.js";
+import { preserveThemeForSiteLinks, validateManifest, wireEventLinks, wireEventSwitcher } from "./events.js";
 
 const $ = (id) => document.getElementById(id);
 let storageKeys = eventStorageKeys(LEGACY_EVENT_ID);
@@ -1113,4 +1113,5 @@ $("theme-toggle").addEventListener("click", () => {
   $("theme-toggle").setAttribute("aria-label", `Switch to ${next === "dark" ? "light" : "dark"} theme`);
 });
 $("retry-load").addEventListener("click", boot);
+wireEventSwitcher(document);
 boot();

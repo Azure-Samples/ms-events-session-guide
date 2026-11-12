@@ -1,6 +1,6 @@
 baseURL = "https://example.org/"
 languageCode = "en-us"
-title = "Events Guide"
+title = "Microsoft Events Guide"
 disableKinds = ["taxonomy", "term", "RSS", "sitemap"]
 enableRobotsTXT = true
 

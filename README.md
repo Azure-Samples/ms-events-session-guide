@@ -26,6 +26,38 @@ npm run dev
 
 Open **http://localhost:1313/**. Use `npm run build` to generate the site and `npm test` to run the tests.
 
+## Testing
+
+Use the fast PR gate for routine changes:
+
+```sh
+npx playwright install chromium
+npm run test:pr
+```
+
+| Command | Scope | When |
+| --- | --- | --- |
+| `npm test` | Direct-code unit/model regressions, workflow guards, and Hugo build checks; no browser processes. | Every PR; during development. |
+| `npm run test:e2e:smoke` | 12 tagged critical Chromium journeys: Save/reload/repeats, event isolation, guide/share/download, navigation, and recovery. | Every PR. |
+| `npm run test:pr` | Both fast gates above. | Local pre-PR check. |
+| `npm run test:e2e:chromium` | Broader single-engine browser regression. | Relevant UI changes/debugging. |
+| `npm run test:e2e:full` | Full desktop/mobile Chromium, Firefox, and WebKit matrix (also `npm run test:e2e`). | Nightly, manual/pre-release. |
+
+For the full matrix, first run `npx playwright install chromium firefox webkit`.
+GitHub Actions runs code regressions plus smoke on PRs and main pushes; the full
+workflow runs daily at 09:00 UTC and through manual dispatch. The workflows become
+active once these changes are merged.
+
+The runner builds isolated, telemetry-free fixtures and owns `127.0.0.1:1414`;
+leave that port free and run browser tiers sequentially. Smoke builds only the
+two-event site; the full tier also builds repository-prefix, extended, real-content,
+and long-prefix sites. Neither changes your running preview or browser profile.
+`npm run test:e2e:smoke:report` opens smoke results; `npm run test:e2e:report` opens
+full results. Smoke uses `test-results/e2e-smoke*`, so it does not overwrite the
+full run's reports, downloads, traces, or build/coverage evidence.
+See [the coverage specification](tests/e2e/e2e-tests.md) for implemented scope and
+calendar-client prerequisites; browser download checks are not calendar imports.
+
 The hosted app collects usage telemetry automatically; [run locally](#run-locally) without telemetry. See [PRIVACY](PRIVACY).
 
 ## Maintainer reference

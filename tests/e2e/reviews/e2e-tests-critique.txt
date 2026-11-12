@@ -1,0 +1,355 @@
+Independent critique: end-to-end test specification
+Reviewed: 2026-11-12
+Branch: experiment/devex-branding
+Scope: tests/e2e/e2e-tests.md and current application/fixture/native-test sources.
+This is specification review, not an execution report. No Playwright tests,
+calendar imports, builds, or application changes were performed for this review.
+Preserve this original critique; append subsequent dispositions separately.
+
+Overall assessment
+------------------
+The specification covers the requested journeys unusually well: a fresh share
+recipient, real download artifacts, agenda persistence, exact repeat selection,
+snapshot-versus-current-catalog semantics, and actual Outlook imports. It correctly
+does not equate parsing with import, claim native-calendar browser automation,
+promise calendar-client deduplication, or assume live multi-tab merging. The
+fixture-only preview/Ignite distinction and disabled local telemetry are correct.
+
+It is a strong coverage index, but not yet an unambiguous executable contract.
+The most important remaining weaknesses are incomplete independent oracles,
+asynchronous persistence readiness, a circular import-case dependency, and
+missing regression variants for the subtler repeat-selection branches.
+The findings below are prioritized corrections, not requests to implement tests
+or expand the product. High means address before implementing the P0 suite;
+Medium means resolve before treating the affected cases as reliable coverage.
+
+CR-01 | High | Golden-guide setup is not fully reproducible
+Cases: E2E-001, 021, 030, 053, 054, 062 and every "Given G".
+Problem: The G recipe leaves Day=2026-11-10 and search=DEV100 active, then says
+"add C2 and CU" without clearing/changing them. CU cannot match that Day filter.
+It also asks the implementer to record distinct notes rather than specifying the
+three exact strings. Different implementations can create different golden
+guides, or get stuck finding CU, while claiming the same case.
+Evidence: app.js bindEvents/reset and filter handlers (868-892);
+catalog.js filterCatalog; fixture CU has no start/end; spec lines 114-120.
+Correction: Define an explicit UI arrangement recipe, including each search and
+Day reset, selected display zone, exact note for each session, and final order.
+Keep construction order separate from expected chronological export order.
+
+CR-02 | High | "Complete snapshot" and calendar assertions lack a complete oracle
+Cases: E2E-001, 023, 027, 030, 037, 038, 050-060, 061-064.
+Problem: The existing facts table omits descriptions, speakers, type, level,
+topic/delivery/viewing/audience arrays, duration, official URLs/notices, exact
+UIDs, and most unscheduled-session details. The calendar oracle nevertheless
+requires exact descriptions/speakers/notices/UID sets. Comparing the recipient
+only with the author or comparing two app exports can let identical omissions
+pass. In particular, two correct calendar events do not prove that the third,
+unscheduled step and all its snapshot facts survived sharing.
+Evidence: guides.js snapshotSession (57-85), validateGuide; app.js renderDialog
+(472-533); catalog.js calendarDescription/calendarExport (259-280);
+tests/fixtures/content/events/*/{index.md,catalog.json,guides.json}.
+Correction: Pin complete expected G snapshots, notes, normalized plain-text
+descriptions, path reasons/takeaways, and UID sets independently of app helpers.
+For example C1b's UID is
+contoso-dev-days-2026:S100-b@ms-events-guide. Explicitly assert all three steps,
+their identity/order, CU's empty times, and every UI-visible snapshot fact.
+If validating invisible payload fields, use a secondary independent
+base64url/zlib/JSON reader against the pinned object, never decodeGuide or
+snapshotSession as the expected-value generator; retain recipient UI checks.
+
+CR-03 | High | Persistence readiness has no defined completion observation
+Cases: E2E-001, 010-019, 022-025, 034-038, 082, 088; execution rule 4.
+Problem: "Do not navigate away before the write completes" is necessary but
+not implementable from Save's toast/count alone. The visible success is emitted
+before the asynchronous Web Lock write resolves. A reload can encounter a
+beforeunload dialog or old storage. Waiting for the already-updated UI would
+produce flaky tests and would not establish durable saving.
+Evidence: app.js storageWrite (104-115), toggleSaved (253-267),
+persistDraft (587-591), beforeunload handler (1018-1022);
+event-state.js withEventStorageLock (30-39).
+Correction: Explicitly permit a bounded read-only persistence observation as a
+secondary readiness check: poll independently specified event-scoped storage
+keys for the exact expected state, then reload and assert the restored UI.
+Do not inject state or call app persistence helpers. Add a real delayed-lock
+variant, acquired after boot, to prove ordered rapid Save/unsave and successive
+draft edits persist the final state once released. Define beforeunload handling
+for fault cases. Do not invent a visible "durably saved" indicator the app lacks.
+
+CR-04 | High | Calendar import cases contain a dependency cycle
+Cases: E2E-059 and E2E-064; also artifact setup for 061-063 and 065.
+Problem: E2E-059 requires importing through E2E-064's procedure, while E2E-064
+requires artifacts "from E2E-059". If artifacts are published only by completed
+cases, neither can complete first. Other cases depend on previous case outputs
+without saying how isolated runs, retries, or parallel workers obtain them.
+E2E-065 refers to "two exports" but its When only re-imports one existing file.
+Evidence: spec lines 482-487, 508-544; catalog.js calendarExport distinguishes
+export generation from calendar-client behavior.
+Correction: Make 059 a browser-only two-download/independent-UID check and 064
+the import/coexistence case. Define a reusable UI-driven artifact arrangement
+that any client case can run independently, with checksum, build/fixture ID,
+producer case/variant, and retention. It must not depend on test execution order.
+Have 065 deliberately obtain a second export before comparing stable UIDs, or
+refer to a clearly identified two-export artifact pair.
+
+CR-05 | High | Repeat Save/Add branch interactions are described but not exercised
+Cases: E2E-011, 013, 014, 021, 036, 076.
+Problem: E2E-021 says that agenda selection is not guide selection, but never
+sets up a conflicting saved repeat. E2E-011 tests the unfiltered choice dialog,
+not the special card branch when a different, filtered-out repeat is saved.
+Those are precisely the paths where a plausible implementation could choose
+the saved time for Add, or silently save a second repeat for an already-Saved
+card. Existing positive cases would still pass.
+Evidence: app.js sessionCard (434-445), renderDialog (518-523), addToDraft
+(680-689), addSessionsToAgenda (269-276).
+Correction: Add independent variants: save C1b, remove Day filtering, then Add
+from card and brief and expect C1a's snapshot while the agenda stays C1b;
+save C1b, filter to C1a, click the Saved card control and expect occurrence
+management rather than silent save/unsave. Also test duplicate Add after changing
+the repeat filter: one step remains and its original snapshot is not replaced.
+
+CR-06 | Medium | Changed-catalog snapshot coverage stops at shared guides
+Cases: E2E-022, 032, 035, 037, 038, 053.
+Problem: The changed-catalog cases strongly cover old share URLs, but do not
+prove that a locally persisted draft still exports its stored facts after a
+catalog update/reload. Edit a copy is also not checked against changed current
+data. An implementation could restore draft facts from live listings while
+leaving shared rendering correct.
+Evidence: app.js restoreLocalData (1033-1044), renderDraft,
+export-draft-guide binding (924-926), edit-shared binding (999-1001);
+docs/design.md Calendar behavior.
+Correction: Reuse the changed/removed-occurrence variants for an author-created
+persisted G, and for Edit a copy of the old shared G. Reload, inspect snapshot
+briefs, and export; expect the pinned original facts while agenda Save resolves
+current IDs. Keep this distinct from requiring the app to synchronize snapshots.
+
+CR-07 | Medium | Actual import verification needs bounded count/fact observations
+Cases: E2E-059-066.
+Problem: "Exactly two appointments" is stronger than seeing two search results
+or an import-success message. The spec does not define the destination calendar
+selection, date-range navigation, completion condition, or how hidden extra
+appointments/duplicates are excluded. The fixed source dates also span 2026
+and 2027, so the calendar's current week is not a suitable oracle.
+The native supplement lacks a specific client/version/zone and artifact mapping.
+Evidence: actual source dates in both fixtures; catalog.js METHOD:PUBLISH and
+UTC serializer; no app-side calendar import API exists.
+Correction: Specify Outlook UI/version/account prerequisites, set and verify
+the client display zone, select only the disposable calendar, navigate the full
+expected date ranges, and inspect each appointment's date, start/end, title,
+room and description. Define bounded polling for completion and evidence of the
+count delta across the relevant ranges, including excluded CU/notes. If client
+re-export is available, independent UID/count comparison is useful additional
+evidence, not a substitute for opening imported appointments and not a new app
+feature requirement. Map the manual supplement to exact source artifacts.
+
+CR-08 | Medium | Race cases do not reliably cause the race they claim to cover
+Cases: E2E-042, 078, 086.
+Problem: A slow network profile does not necessarily delay local compression,
+localStorage locks, or decode of an already-loaded token. Ordinary Back/Forward
+can complete decode before the next action. E2E-078's claim about a late decode
+may therefore pass without executing the relevant interleaving. E2E-042 names
+controlled compression but does not state the permissible mechanism.
+Evidence: guides.js encodeGuide/decodeGuide use local CompressionStreams;
+app.js shareGuide revision checks (821-846), syncSharedView revision checks
+(780-818), dismissSharedView (593-600).
+Correction: Define a narrow test-only gate that delays the real native stream's
+completion, not a mocked successful share payload. Wait until the operation
+is demonstrably in flight, perform the newer edit/navigation, release it, then
+assert the newest URL/view/content wins. Cover delayed decode followed by
+Back to my draft or a different share, plus failed-operation retry. Record the
+injection and keep the normal ungated journey as the baseline.
+
+CR-09 | Medium | Several givens and destructive-scope assertions are under-specified
+Cases: E2E-012, 016, 022, 025, 034, 035, 036, 080, 083.
+Problem: "A saved agenda", "G", "distinct draft D", and "a valid new selection"
+are not always accompanied by exact membership/notes or a UI setup recipe.
+For example 016 checks that Clear affects only this event, but does not create
+another event's saved state, so clearing all events could pass. In 022, G starts
+C2/C1b/CU and "moves C1b earlier" leaves a two-step order that should be explicit.
+Evidence: app.js event-scoped storage keys, clear-agenda/clear-draft bindings,
+replaceDraft and restoreLocalData.
+Correction: Declare shared arrangement recipes for exact agendas, draft D, and
+edited G, constructed through UI in each independent case. Name final ordered
+steps and expected counts. For cross-event destructive scope, seed the second
+event through UI and reopen it afterward. Add reload assertions after partial
+shared Save and missing-occurrence Save, not only after the clean G variant.
+
+CR-10 | Medium | Exact text round-trip expectation needs documented normalization
+Cases: E2E-027, 030, 032.
+Problem: E2E-027 broadly requires accepted text/line breaks to round-trip exactly
+without distinguishing a single-line title from multiline summary/notes or
+the intentional trimming of a shared guide title. Leading/trailing title spaces
+persist locally but are removed during guide validation for sharing. A test
+using those inputs could incorrectly classify supported normalization as a bug.
+Evidence: guides.js text/validateGuide (19-24, 91-92);
+event-state.js validateStoredDraft; layouts/events/single.html guide-title input
+versus guide-summary textarea.
+Correction: State title trimming explicitly, test title whitespace separately,
+and assign newline preservation to multiline fields. Exercise maxlength through
+real typing/paste rather than assuming programmatic fill enforces every native
+input constraint. Keep HTML-like text assertions literal and inert. Changing
+title normalization or adding multiline titles would be a feature request, not
+a correction required by current behavior.
+
+CR-11 | Medium | Minimal coverage matrix and reportable variants are not enumerable
+Cases: all; especially E2E-050, 057, 071, 080, 082 and completion gate.
+Problem: The matrix combines desktop engines, mobile engines, six widths, both
+themes, three time zones, real/fixture/subpath sites, entry points and fault
+variants, but does not say which are a cross-product and which are sampled.
+"Golden journey", "time-sensitive cases", and "dropdown regressions" are not
+mapped to exact case IDs. One pass row for a many-variant case could mask a
+missing required variant. The release gate cannot be objectively evaluated.
+Evidence: spec execution/environment sections and completion rules;
+package.json has native node tests only and no Playwright runner/configuration.
+Correction: Preserve the good placement at tests/e2e/ and stable case IDs.
+Add a small explicit required-project/variant table and suffix convention
+(for example E2E-050/card, /dialog, /agenda). Separate browser core, responsive
+sampling, real-Ignite legacy smoke, subpath, and client projects; give the
+Outlook client its own browser/zone requirements rather than accidentally
+requiring every browser/mobile permutation. Each required variant must be
+Pass/Fail/Blocked; state precisely how blocked P0s affect the release exception.
+No new runner or dependencies are required for this specification revision.
+
+CR-12 | Medium | Fixture/error prerequisites need an implementation-ready map
+Cases: E2E-017, 026, 037, 038, 040-042, 060, 075, 076, 079, 080.
+Problem: Extended fixture recipes are appropriately labeled as not yet present,
+but do not identify per-case variant names, exact mutations, expected values,
+or how they remain build-valid. Removing an occurrence that is the only one for
+a curated code can cause a Hugo validation failure before browser behavior is
+tested. Invalid catalog handling needs a response interception rather than an
+assumption that a rejected build will serve that payload. Existing fixtures
+also have limited facet diversity; "combine facets" needs exact match sets.
+Evidence: tests/events.test.mjs invalid-bundle build guards;
+catalog.js createCatalog validation; fixture guides.json curated references;
+app.js boot (1049-1103); guides.js decodeGuide bounded validation.
+Correction: Provide a fixture-to-case prerequisite table, including build-valid
+changed/removed-repeat variants and independently pinned expected query results.
+Distinguish build fixtures from intercepted invalid runtime responses. Name fixed
+legacy/malformed token artifacts and intended root/event route. Include a small
+representative semantic-invalid share variant (for example duplicate session or
+invalid time range) and bounded-decompression failure; these exercise existing
+validation, not a promise to accept arbitrary malformed snapshots. Do not repeat
+the full unit-test fuzzing matrix in browser tests.
+
+Additional opportunities, lower priority
+---------------------------------------
+CR-13 | Low | Navigation should explicitly prove non-propagation of private state
+Cases: E2E-018, 039, 070, 073, 077, 085.
+Problem: Existing navigation cases verify destination, state isolation and theme,
+but do not explicitly check that an ordinary Switch event/All events link from
+a shared, filtered view drops that view's guide token and filters. Copy view link
+is tested, but it is a different control/path.
+Evidence: events.js preserveThemeForSiteLinks (219-229);
+layouts/partials/events/switcher.html; tests/events.test.mjs test
+"event navigation preserves only an explicitly chosen theme, not private view state".
+Correction: Add one combined navigation variant starting with guide, filter and
+explicit theme parameters. Expect only the supported theme to propagate through
+ordinary event/directory links, no token/filter leakage, normal native navigation,
+and unchanged per-event storage. This is existing behavior, not a new privacy UI.
+
+CR-14 | Low | Local telemetry negative test should observe the full action lifetime
+Cases: E2E-087; execution contract and environments.
+Problem: "No ingestion request" can pass if observation ends before a background
+send would occur. Blocking domains alone cannot prove no send was attempted.
+Evidence: layouts/partials/telemetry-state.html compile-time defines;
+docs/design.md local/hosted analytics distinction.
+Correction: Keep all ordinary runs explicitly telemetry-disabled. Install a
+request observer before navigation, observe through the complete journey and
+page close, and fail on attempted ingestion, including blocked requests.
+Optionally assert disabled build configuration as supporting evidence. Do not
+enable hosted analytics, add a consent banner expectation, or change Azure for
+this test-spec task.
+
+Suggested revision sequence
+---------------------------
+1. Make G, snapshot/calendar oracles, and persistence readiness exact (CR-01-03).
+2. Break the import dependency cycle and make client evidence explicit (04, 07).
+3. Add repeat-selection and persisted-snapshot regression variants (05, 06).
+4. Nail down race controls, per-case setup, normalization and required variants
+   (08-12); then consider the two low-priority opportunities.
+
+Placement recommendation
+------------------------
+tests/e2e/e2e-tests.md is preferable to a root-level specification for growth.
+Keep one coverage index, future executable workflows alongside it, existing
+shared fixtures in tests/fixtures/, and this review under tests/e2e/reviews/.
+Use case-to-test mappings when splitting; do not duplicate the plan at root or
+create a separate overlapping index. Generated artifacts should remain outside
+the source/review tree in ignored output directories.
+
+Parent revision dispositions (2026-11-12)
+---------------------------------------
+These are specification corrections, not claims that the E2E suite, extended
+fixtures, test harness gates, or actual calendar imports have been implemented
+or executed. The original independent findings above are preserved.
+
+CR-01: Addressed. Golden G now has explicit filter resets, UTC selection,
+construction/final order, exact notes and persistence-before-reload steps.
+CR-02: Addressed. Added complete G snapshot fields, normalized descriptions,
+exact notes, path-copy oracle, UID sets and calendar notice strings. Recipient
+UI must include all three steps and snapshot briefs; an independent reader may
+check payload-only fields without replacing the UI round trip.
+CR-03: Addressed. Defined bounded read-only polling of exact event-scoped state
+followed by restored-UI assertions, explicit beforeunload handling, and E2E-089
+using an actual held Web Lock acquired after app boot/persistence.
+CR-04: Addressed. E2E-059 is browser-only. Client cases independently replay the
+UI producer recipe or retrieve a verified build/fixture-bound artifact, with
+checksum/provenance; E2E-065 now deliberately obtains the second export.
+CR-05: Addressed. Added E2E-009's filtered-out saved-repeat management and
+E2E-021 saved-time-independent card/dialog and duplicate-repeat variants.
+CR-06: Addressed. E2E-037 now includes persisted-draft and Edit a copy under
+FX-CHANGED; E2E-038 also protects persisted drafts under FX-REMOVED.
+CR-07: Addressed. Added isolated destination selection, actual client-zone
+verification, 120-second bounded import observation, full-range count delta,
+appointment inspection, teardown, and exact native-artifact mappings.
+CR-08: Addressed. Named native stream completion gates and started/release
+signals; E2E-043 tests late decode versus newer editor/share state. Ordinary
+history and slow network cases no longer claim to force local stream races.
+CR-09: Addressed. Added exact UI arrangements for agenda A, recipient draft D,
+F-state and Edited G; destructive cases seed/check F, and partial/shared Save
+variants require persistence and reload.
+CR-10: Addressed. Separated single-line trimmed shared titles from exact
+multiline summary/notes, named the whitespace-title variant, and required real
+typing/paste for native maxlength boundaries.
+CR-11: Addressed. Added explicit non-Cartesian project matrix, case/variant
+suffixes, engine/viewport/theme/zone sampling, separate Outlook/manual rows,
+and blocked-P0 release-exception requirements.
+CR-12: Addressed at specification level. Added FX/LINK/FAULT/GATE prerequisite
+mapping, concrete changed/removed-repeat data, exact existing-facet result
+sets, semantic-invalid and decompression-limit link variants. Future fixture
+implementation must pin literal generated data/hashes before dependent rows
+can run; this work has not been silently treated as completed.
+CR-13: Addressed. E2E-073/private-state verifies only the explicit theme survives
+ordinary Switch event and All events links, without guide/filter propagation.
+CR-14: Addressed. E2E-087 now observes attempted requests from before navigation
+through full interaction/navigation/page-close lifetime; domain blocking alone
+cannot count as proof that no analytics send was attempted.
+
+Placement outcome: tests/e2e/e2e-tests.md is the single source coverage index;
+this review stays under tests/e2e/reviews/. No runner, dependencies, app changes,
+calendar account actions, push, or deployment were added for this documentation
+task.
+
+Executable implementation follow-up (2026-11-12)
+----------------------------------------------
+The user subsequently requested implementation and execution. Playwright specs,
+runner, isolated fixture server, independent ical.js oracle, extended generated
+fixtures, real native stream/lock races, and machine-readable coverage now live
+beside the specification. All browser-only case IDs have executable coverage;
+this does not certify every aspirational prose variant or calendar import.
+
+Independent code review of the executable harness found two concrete issues:
+the copied-view-link recipient bypassed error/network guards, and runtime
+metadata used project-default rather than effective per-test time zones.
+Both were corrected and the reviewer found no further significant issues in
+those fixes. Effective time-zone evidence was checked for all45 sampled rows.
+All browser contexts now block unexpected off-origin HTTP requests, including
+analytics, rather than depending only on known telemetry hostname patterns.
+
+Initial execution also corrected mistaken test assumptions without changing app
+behavior: Hugo paragraph descriptions retain a final LF, empty shared notes
+show an intentional placeholder, native modal traversal may visit browser chrome,
+and WebKit legitimately formats a midnight date separator as "at". Full keyboard
+coverage is sampled on desktop Chromium, as the P1 baseline intended; other
+engines' host-native full-keyboard-access preferences are not changed silently.
+Actual Outlook/native-calendar imports remain explicit authorization/client
+prerequisites, not skipped-success placeholders.

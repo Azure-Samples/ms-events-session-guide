@@ -5,9 +5,10 @@
 <meta name="referrer" content="no-referrer">
 <meta name="description" content="{{ .description }}">
 <title>{{ .title }}</title>
-{{ $styles := resources.Get "css/main.css" | minify | fingerprint "sha256" -}}
+{{ $styles := slice (resources.Get "css/main.css") (resources.Get "css/devex.css") | resources.Concat "css/site.css" | minify | fingerprint "sha256" -}}
 <link rel="stylesheet" href="{{ $styles.RelPermalink }}" integrity="{{ $styles.Data.Integrity }}">
 {{ range .preload -}}
 <link rel="preload" href="{{ . }}" as="fetch" crossorigin>
 {{ end -}}
-<link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">
+{{ $favicon := ((resources.Get "images/devex/phoenix-mark.png").Crop "704x704 Center").Resize "32x32 png" | fingerprint "sha256" -}}
+<link rel="icon" href="{{ $favicon.RelPermalink }}" sizes="32x32" type="image/png">

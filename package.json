@@ -7,7 +7,18 @@
   },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
+    "test:pr": "npm test && npm run test:e2e:smoke",
+    "test:e2e": "playwright test",
+    "test:e2e:full": "playwright test",
+    "test:e2e:smoke": "playwright test --config=playwright.smoke.config.mjs",
+    "test:e2e:smoke:report": "playwright show-report test-results/e2e-smoke-report",
+    "test:e2e:chromium": "playwright test --project=chromium",
+    "test:e2e:report": "playwright show-report",
     "build": "hugo --gc --minify --cleanDestinationDir",
     "dev": "hugo server --bind 127.0.0.1 --disableFastRender"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "ical.js": "2.2.1"
   }
 }

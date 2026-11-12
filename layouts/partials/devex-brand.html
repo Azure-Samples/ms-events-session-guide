@@ -1,0 +1,9 @@
+{{- /* Copyright (c) Microsoft Corporation. Licensed under the MIT license. */ -}}
+{{- $mark := (resources.Get "images/devex/phoenix-mark.png").Resize "96x webp q85" | fingerprint "sha256" -}}
+<a class="brand devex-brand" href="{{ site.Home.RelPermalink }}" aria-label="Microsoft Events Guide: DevEx Center of Excellence home">
+  <img src="{{ $mark.RelPermalink }}" width="32" height="32" alt="" decoding="async">
+  <span class="devex-brand-copy">
+    <strong>Microsoft Events Guide</strong>
+    <span class="devex-brand-team">DevEx Center of Excellence</span>
+  </span>
+</a>

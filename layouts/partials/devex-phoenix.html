@@ -1,0 +1,10 @@
+{{- /* Copyright (c) Microsoft Corporation. Licensed under the MIT license. */ -}}
+{{- $source := resources.Get "images/devex/phoenix.png" -}}
+{{- $small := $source.Resize "360x webp q85" | fingerprint "sha256" -}}
+{{- $large := $source.Resize "720x webp q85" | fingerprint "sha256" -}}
+<figure class="devex-hero-art" aria-hidden="true">
+  <img src="{{ $large.RelPermalink }}"
+    srcset="{{ $small.RelPermalink }} 360w, {{ $large.RelPermalink }} 720w"
+    sizes="(max-width: 600px) 104px, (max-width: 1000px) 240px, 360px"
+    width="720" height="720" alt="" decoding="async" fetchpriority="high">
+</figure>
