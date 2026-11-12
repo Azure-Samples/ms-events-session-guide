@@ -10,6 +10,16 @@ The directory loads a small event manifest, not every session catalog. Each even
 
 Drafts and agendas are isolated by event and browser origin. Shared guides are validated snapshots carried in URLs; the site stores no guide database. Session text and personal notes are rendered as text, never executable HTML.
 
+## Event links
+
+Direct event paths such as `/events/ignite-2026/` remain the canonical entry points. A root link with `?event=ignite-2026` opens that published event, preserving the original query parameters and fragment, including filters, theme, and shared-guide tokens. This also works when the site is deployed under a repository subpath.
+
+Every published event must have an `event` parameter mapping: its permanent `params.eventId` maps to its published URL in the generated event manifest. For example, `event=ignite-2026` maps to `/events/ignite-2026/`. New event bundles supply this mapping automatically through their metadata; no separate alias list or JavaScript change is required.
+
+An empty, repeated, or unknown event selector shows an error and leaves the directory available; it never silently opens Ignite or accepts an arbitrary destination URL. When both `event` and `guide` are present, the selector must match the validated shared guide's event. Existing root links without `event` retain their legacy behavior.
+
+A vanity link such as `https://aka.ms/MsEventGuide?event=ignite-2026` works only if the redirect forwards the query string to the app.
+
 ## Calendar behavior
 
 Scheduled sessions and entire built-in, custom, or shared guides export as standard `.ics` downloads. Repeated sessions require a specific occurrence. Import requires the calendar client's confirmation; the app does not silently write to calendars.
@@ -55,7 +65,7 @@ Array order in `guides.json` determines audience/path ordering and defaults. Eac
 
 Add **only a new directory** under `content/events/EVENT_ID/`, containing:
 
-1. `index.md`: copy the Ignite front matter, set a permanent lowercase `params.eventId` equal to the directory name, title, summary, ISO start/end dates, IANA time zone, HTTPS official catalog URL, keywords, and `catalogFormat`. Keep `build.publishResources: false`.
+1. `index.md`: copy the Ignite front matter, set a permanent lowercase `params.eventId` equal to the directory name, title, summary, ISO start/end dates, IANA time zone, HTTPS official catalog URL, keywords, and `catalogFormat`. The event ID also defines its required `?event=EVENT_ID` mapping. Keep `build.publishResources: false`.
 2. `catalog.json`: use `catalogFormat: normalized` for an object with `updated` and `instances`. Each instance has `id`, `sessionId`, `code`, `title`, `description`, `speakers`, `type`, `level`, `topics`, `delivery`, `audiences`, `viewing`, `start`, `end`, `duration`, and `location`. Use ISO times with offsets; both start/end may be empty for unscheduled sessions. The existing Ignite raw format is also supported through `catalogFormat: ignite`.
 3. `guides.json`: ordered `audiences: [{id, label}]` and `paths`. Paths use the existing `id`, `audience`, `name`, `label`, `headline`, `description`, `fit`, `outcome`, and `steps: [{code, stage, why, takeaway}]` fields.
 

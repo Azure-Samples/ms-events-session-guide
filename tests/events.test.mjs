@@ -119,6 +119,9 @@ test("legacy root links are recognized, but theme-only and plain links stay on d
     assert.ok(legacyRouteKind(`?scoutTheme=dark&${key}=`, ""), `${key} with theme`);
   }
   assert.equal(legacyRouteKind("?guide=1.abc&q=ai", "#my-guide"), "guide");
+  assert.equal(legacyRouteKind("?event=ignite-2026", ""), "event");
+  assert.equal(legacyRouteKind("?event=fabrikam-summit-2027&q=ai", "#catalog"), "event");
+  assert.equal(legacyRouteKind("?event=ignite-2026&guide=1.abc", ""), "guide");
   assert.equal(legacyRouteKind("?q=ai&audience=digital-native&tz=UTC", ""), "view");
   for (const hash of ["#guide", "#catalog", "#my-guide", "#agenda"]) assert.equal(legacyRouteKind("", hash), "view");
   assert.equal(legacyRouteKind("?scoutTheme=dark", ""), null);
@@ -150,6 +153,58 @@ const manifestEvents = [
   event({ url: "/repo/events/ignite-2026/" }),
   event({ id: "fabrikam-summit-2027", url: "/repo/events/fabrikam-summit-2027/" }),
 ];
+
+test("event query selects a published event and preserves query and hash verbatim", async () => {
+  for (const prefix of ["", "/repo"]) {
+    const events = manifestEvents.map((item) => ({ ...item, url: `${prefix}/events/${item.id}/` }));
+    for (const eventId of ["ignite-2026", "fabrikam-summit-2027"]) {
+      const search = `?event=${eventId}&q=caf%C3%A9+ai&scoutTheme=dark&audience=nonprofit&tz=UTC`;
+      const result = await resolveLegacyRoute({ origin: "https://guide.example", search, hash: "#catalog" }, events, helpers);
+      assert.equal(result.type, "redirect");
+      assert.equal(result.event.id, eventId);
+      assert.equal(result.url, `https://guide.example${prefix}/events/${eventId}/${search}#catalog`);
+    }
+  }
+});
+
+test("invalid event selectors show an error instead of falling back to Ignite", async () => {
+  for (const search of [
+    "?event=unknown-event", "?event=", "?event", "?event=IGNITE-2026",
+    "?event=https%3A%2F%2Fevil.example", "?event=..%2Fignite-2026",
+    "?event=ignite-2026&event=fabrikam-summit-2027", "?event=ignite-2026&event=ignite-2026",
+    "?event=unknown-event&q=ai", "?event=&q=ai",
+  ]) {
+    const result = await resolveLegacyRoute({ origin: "https://guide.example", search, hash: "#catalog" }, manifestEvents, helpers);
+    assert.equal(result.type, "error", search);
+    assert.ok(result.message);
+    assert.equal(result.url, undefined);
+  }
+});
+
+test("event selectors must agree with validated shared-guide identities", async () => {
+  for (const version of [1, 2]) {
+    const eventId = version === 1 ? "ignite-2026" : "fabrikam-summit-2027";
+    const token = await encodeGuide({
+      version, ...(version === 2 ? { eventId } : {}), title: "Shared guide", summary: "",
+      steps: [{ session: snapshot(), note: "Preserved" }],
+    });
+    const search = `?event=${eventId}&guide=${token}&scoutTheme=light`;
+    const result = await resolveLegacyRoute({ origin: "https://org.github.io", search, hash: "#my-guide" }, manifestEvents, helpers);
+    assert.equal(result.type, "redirect");
+    assert.equal(result.url, `https://org.github.io/repo/events/${eventId}/${search}#my-guide`);
+    const otherEvent = version === 1 ? "fabrikam-summit-2027" : "ignite-2026";
+    const mismatch = await resolveLegacyRoute({
+      origin: "https://org.github.io", search: `?event=${otherEvent}&guide=${token}`, hash: "",
+    }, manifestEvents, helpers);
+    assert.equal(mismatch.type, "error");
+    assert.match(mismatch.message, /does not match/);
+  }
+  const invalid = await resolveLegacyRoute({
+    origin: "https://org.github.io", search: "?event=ignite-2026&guide=2.invalid", hash: "",
+  }, manifestEvents, helpers);
+  assert.equal(invalid.type, "error");
+  assert.match(invalid.message, /^This guide link is not valid/);
+});
 
 test("legacy bridge validates version-1 tokens, routes them to Ignite and keeps them verbatim", async () => {
   const token = await encodeGuide({
@@ -336,7 +391,13 @@ test("fixture build supports two events, reused IDs, novel audiences, and reposi
       ["contoso-dev-days-2026", "/repo/events/contoso-dev-days-2026/"],
       ["fabrikam-summit-2027", "/repo/events/fabrikam-summit-2027/"],
     ]);
-    for (const item of manifest.events) assert.match(item.catalogAssetUrl, new RegExp(`^/repo/data/events/${item.id}/catalog\\.`));
+    for (const item of manifest.events) {
+      assert.match(item.catalogAssetUrl, new RegExp(`^/repo/data/events/${item.id}/catalog\\.`));
+      const search = `?event=${item.id}`;
+      const route = await resolveLegacyRoute({ origin: "https://org.github.io", search, hash: "" }, manifest.events, helpers);
+      assert.equal(route.type, "redirect");
+      assert.equal(route.url, `https://org.github.io${item.url}${search}`);
+    }
     const contoso = await readJSON(out, /^data\/events\/contoso-dev-days-2026\/catalog\./);
     const fabrikam = await readJSON(out, /^data\/events\/fabrikam-summit-2027\/catalog\./);
     assert.ok(contoso.instances.some((item) => item.id === "S100-a" && item.code === "DEV100"));

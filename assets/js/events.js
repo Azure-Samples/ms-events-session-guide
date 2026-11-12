@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 // Pure helpers for event discovery: metadata validation, event-local status,
-// highlights, search, and the legacy root-link bridge. No DOM or storage access.
+// highlights, search, and root-link routing. No DOM or storage access.
 
 import { normalizeSearch } from "./catalog.js";
 import { validateEvent } from "./event-context.js";
@@ -107,6 +107,7 @@ export function searchEvents(events, query) {
 export function legacyRouteKind(search, hash) {
   const params = new URLSearchParams(search);
   if (params.has("guide")) return "guide";
+  if (params.has("event")) return "event";
   if (LEGACY_QUERY_PARAMETERS.some((key) => params.has(key))) return "view";
   if (LEGACY_HASHES.includes(String(hash || "").replace(/^#/, ""))) return "view";
   return null;
@@ -119,7 +120,7 @@ export function eventDestination(eventUrl, origin, search, hash) {
   return `${target.origin}${target.pathname}${search || ""}${hash || ""}`;
 }
 
-// Resolves a legacy root link to its event. Version-1 guide tokens and
+// Resolves an explicit event selector or a legacy root link. Version-1 guide tokens and
 // pre-multi-event view links belong to the legacy event; every guide token
 // (v1 included) is decoded and validated before its event identity is trusted.
 export async function resolveLegacyRoute(location, events, {
@@ -127,13 +128,22 @@ export async function resolveLegacyRoute(location, events, {
 }) {
   const kind = legacyRouteKind(location.search, location.hash);
   if (!kind) return { type: "none" };
-  let eventId = legacyEventId;
+  const params = new URLSearchParams(location.search);
+  const requestedEvents = params.getAll("event");
+  if (requestedEvents.length > 1 || (requestedEvents.length === 1 && !requestedEvents[0])) {
+    return { type: "error", message: "Specify exactly one nonempty event ID in the event parameter." };
+  }
+  const requestedEvent = requestedEvents[0];
+  let eventId = requestedEvent ?? legacyEventId;
   if (kind === "guide") {
-    const token = new URLSearchParams(location.search).get("guide");
+    const token = params.get("guide");
     try {
       eventId = getGuideEventId(await decodeGuide(token));
     } catch (error) {
       return { type: "error", message: `This guide link is not valid: ${error.message}` };
+    }
+    if (requestedEvent && requestedEvent !== eventId) {
+      return { type: "error", message: "The event parameter does not match this shared guide's event. Nothing was imported or saved." };
     }
   }
   const event = events.find((item) => item.id === eventId);
