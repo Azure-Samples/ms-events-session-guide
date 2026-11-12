@@ -15,15 +15,48 @@ export function compareInstances(a, b) {
 }
 
 export function createCatalog(payload) {
-  if (!Array.isArray(payload.instances) || !Array.isArray(payload.guide?.paths)) {
+  if (!payload || typeof payload !== "object" || !Array.isArray(payload.instances) ||
+      !payload.guide || typeof payload.guide !== "object" || !Array.isArray(payload.guide.paths)) {
     throw new Error("The generated catalog has an unexpected shape. Rebuild the Hugo site.");
+  }
+  const event = payload.event === undefined ? LEGACY_EVENT : validateEvent(payload.event);
+  if (payload.event !== undefined && !payload.guide.paths.some((path) =>
+    Array.isArray(path?.steps) && path.steps.length)) {
+    throw new Error("The generated catalog must contain a nonempty curated guide.");
+  }
+  const audiences = payload.guide.audiences === undefined && payload.event === undefined ?
+    LEGACY_AUDIENCES : payload.guide.audiences;
+  if (!Array.isArray(audiences) || !audiences.length) {
+    throw new Error("The generated catalog must define its guide audiences.");
+  }
+  const audienceIds = new Set();
+  for (const audience of audiences) {
+    if (!audience || typeof audience !== "object" || typeof audience.label !== "string" ||
+        !audience.label.trim()) throw new Error("Each guide audience must have an ID and label.");
+    validateEventId(audience.id);
+    if (audience.id === "custom") throw new Error("The custom audience ID is reserved for the guide editor.");
+    if (audienceIds.has(audience.id)) throw new Error("Guide audience IDs must be unique.");
+    audienceIds.add(audience.id);
   }
   const byId = new Map();
   const byCode = new Map();
   const instanceById = new Map();
   for (const instance of payload.instances) {
-    if (!instance.id || !instance.sessionId || !instance.title || instanceById.has(instance.id)) {
+    if (!instance || typeof instance !== "object" ||
+        ["id", "sessionId", "code", "title"].some((key) => typeof instance[key] !== "string" || !instance[key]) ||
+        ["description", "speakers", "type", "level", "start", "end", "location"]
+          .some((key) => typeof instance[key] !== "string") ||
+        !Number.isInteger(instance.duration) || instance.duration < 0 || instance.duration > 1440 ||
+        ["topics", "delivery", "viewing"].some((key) =>
+          !Array.isArray(instance[key]) || Array.from(instance[key]).some((item) => typeof item !== "string")) ||
+        (instance.audiences !== undefined && (!Array.isArray(instance.audiences) ||
+          Array.from(instance.audiences).some((item) => typeof item !== "string"))) ||
+        instanceById.has(instance.id)) {
       throw new Error("The catalog contains an invalid or duplicate session instance.");
+    }
+    if ((byCode.has(instance.code) && byCode.get(instance.code).sessionId !== instance.sessionId) ||
+        (byId.has(instance.sessionId) && byId.get(instance.sessionId).code !== instance.code)) {
+      throw new Error("The catalog contains inconsistent or duplicate session codes.");
     }
     instanceById.set(instance.id, instance);
     if (!byId.has(instance.sessionId)) {
@@ -33,8 +66,21 @@ export function createCatalog(payload) {
     }
     byId.get(instance.sessionId).instances.push(instance);
   }
+  const pathIds = new Set();
   for (const path of payload.guide.paths) {
-    path.steps.forEach((step, index) => {
+    if (!path || typeof path !== "object" || typeof path.id !== "string" || !path.id ||
+        pathIds.has(path.id)) throw new Error("Every guide must have a unique ID.");
+    if (!audienceIds.has(path.audience)) {
+      throw new Error("Every guide must target a configured audience.");
+    }
+    if (typeof path.name !== "string" || !path.name || !Array.isArray(path.steps)) {
+      throw new Error("Every guide must have a name and a list of steps.");
+    }
+    pathIds.add(path.id);
+    Array.from(path.steps).forEach((step, index) => {
+      if (!step || typeof step !== "object" || typeof step.code !== "string" || !step.code) {
+        throw new Error("Every guide step must reference a session code.");
+      }
       const session = byCode.get(step.code);
       if (!session) throw new Error(`The ${path.name} path references a missing session: ${step.code}.`);
       session.recommendations.push({ path, step, index });
@@ -47,7 +93,7 @@ export function createCatalog(payload) {
       instance.code, instance.title, instance.description, instance.speakers, ...instance.topics,
     ]).join(" "));
   });
-  return { sessions, byId, byCode, instanceById, paths: payload.guide.paths, updated: payload.updated };
+  return { event, audiences, sessions, byId, byCode, instanceById, paths: payload.guide.paths, updated: payload.updated };
 }
 
 export function normalizeSearch(value) {
@@ -68,9 +114,19 @@ export function dateKey(value, timeZone) {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
-export function filterCatalog(catalog, filters, timeZone) {
+export function getAudiencePaths(paths, audience) {
+  return paths.filter((path) => path.audience === audience);
+}
+
+export function audienceRecommendations(session, audience) {
+  return session.recommendations.filter(({ path }) => !audience || path.audience === audience);
+}
+
+export function filterCatalog(catalog, filters, timeZone, audience) {
   const words = normalizeSearch(filters.q || "").split(/\s+/).filter(Boolean);
-  const path = catalog.paths.find((item) => item.id === filters.path);
+  const paths = audience ? getAudiencePaths(catalog.paths, audience) : catalog.paths;
+  const path = paths.find((item) => item.id === filters.path);
+  if (audience && filters.path && !path) return [];
   const results = [];
   for (const session of catalog.sessions) {
     if (words.some((word) => !session.searchText.includes(word))) continue;
@@ -90,7 +146,8 @@ export function filterCatalog(catalog, filters, timeZone) {
     if (filters.sort === "time") return compareInstances(a.instances[0], b.instances[0]);
     if (path) return path.steps.findIndex((step) => step.code === a.code) -
       path.steps.findIndex((step) => step.code === b.code);
-    return Number(b.recommendations.length > 0) - Number(a.recommendations.length > 0) ||
+    return Number(audienceRecommendations(b, audience).length > 0) -
+      Number(audienceRecommendations(a, audience).length > 0) ||
       a.title.localeCompare(b.title);
   });
 }
@@ -120,16 +177,32 @@ export function readFilters(search) {
   return filters;
 }
 
-export function readViewState(search, paths) {
+export function readViewState(search, paths, event = LEGACY_EVENT, audiences) {
+  const options = Object.hasOwn(event, "eventTimeZone") ? event : null;
+  const eventTimeZone = options ? options.eventTimeZone : event.timeZone;
+  audiences = audiences || options?.audiences;
   const params = new URLSearchParams(search);
-  const audience = params.get("audience") === "digital-native" ? "digital-native" : "startup";
-  const preferredPath = params.get("route") || (audience === "digital-native" ? "scale" : "launch");
+  const filters = readFilters(search);
+  const linkedPath = paths.find((path) => path.id === params.get("route")) ||
+    paths.find((path) => path.id === filters.path);
+  const requestedAudience = params.get("audience");
+  const availableIds = new Set(paths.map((path) => path.audience));
+  if (!audiences && paths.every((path) => LEGACY_AUDIENCES.some((item) => item.id === path.audience))) {
+    for (const item of LEGACY_AUDIENCES) availableIds.add(item.id);
+  }
+  const audience = availableIds.has(requestedAudience) ?
+    requestedAudience : linkedPath?.audience || paths[0]?.audience;
+  const available = getAudiencePaths(paths, audience);
+  if (!available.length) throw new Error(`No guides are configured for ${audience}.`);
+  const selected = available.find((path) => path.id === params.get("route")) ||
+    available.find((path) => path.id === filters.path) || available[0];
+  if (!available.some((path) => path.id === filters.path)) filters.path = "";
   return {
-    filters: readFilters(search),
+    filters,
     audience,
-    activePath: paths.some((path) => path.id === preferredPath) ? preferredPath : "launch",
-    zoneChoice: ["local", "UTC", "America/Los_Angeles"].includes(params.get("tz")) ?
-      params.get("tz") : "America/Los_Angeles",
+    activePath: selected.id,
+    zoneChoice: ["local", "UTC", eventTimeZone].includes(params.get("tz")) ?
+      params.get("tz") : eventTimeZone,
   };
 }
 
@@ -178,18 +251,32 @@ function foldCalendarLine(line) {
   return lines.join("\r\n");
 }
 
-export function calendarExport(instances, now = new Date()) {
+export function calendarSessions(instances) {
+  return [...new Map(instances.filter(isScheduled).map((instance) => [instance.id, instance])).values()]
+    .sort(compareInstances);
+}
+
+function calendarDescription(instance, event) {
+  return `${instance.description}\nSpeakers: ${instance.speakers || "Not listed"}\nVerify times and attendance in the official ${event.name} catalog: ${event.catalogUrl}. Saving is not a reservation.`;
+}
+
+export function calendarExport(instances, now = new Date(), name = "Ignite 2026 - My field guide", event = LEGACY_EVENT) {
+  event = validateEvent(event);
+  if (arguments[2] === undefined && event.id !== LEGACY_EVENT_ID) name = `${event.name} - My guide`;
   const timestamp = (value) => new Date(value).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Ignite Field Guide//2026//EN",
-    "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Ignite 2026 - My field guide"];
-  for (const instance of instances.filter(isScheduled).sort(compareInstances)) {
-    lines.push("BEGIN:VEVENT", `UID:${escapeCalendar(instance.id)}@ignite-field-guide`,
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Microsoft//Events Guide//EN",
+    "CALSCALE:GREGORIAN", "METHOD:PUBLISH", `X-WR-CALNAME:${escapeCalendar(name)}`];
+  for (const instance of calendarSessions(instances)) {
+    const uid = event.id === LEGACY_EVENT_ID ? `${instance.id}@ignite-field-guide` :
+      `${event.id}:${instance.id}@ms-events-guide`;
+    lines.push("BEGIN:VEVENT", `UID:${escapeCalendar(uid)}`,
       `DTSTAMP:${timestamp(now)}`, `DTSTART:${timestamp(instance.start)}`,
       `DTEND:${timestamp(instance.end)}`,
       `SUMMARY:${escapeCalendar(`${instance.code}: ${instance.title}`)}`,
-      `DESCRIPTION:${escapeCalendar(`${instance.description}\nSpeakers: ${instance.speakers || "Not listed"}\nVerify times and attendance in the official Ignite catalog. Saving is not a reservation.`)}`,
+      `DESCRIPTION:${escapeCalendar(calendarDescription(instance, event))}`,
       `LOCATION:${escapeCalendar(instance.location || "Location not listed")}`, "END:VEVENT");
   }
   lines.push("END:VCALENDAR");
   return `${lines.map(foldCalendarLine).join("\r\n")}\r\n`;
 }
+import { LEGACY_AUDIENCES, LEGACY_EVENT, LEGACY_EVENT_ID, validateEvent, validateEventId } from "./event-context.js";

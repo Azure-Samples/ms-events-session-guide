@@ -154,6 +154,18 @@ select { max-width: 100%; color: var(--cp-text); background: var(--cp-surface); 
 .save-button { background: none; border: 1px solid var(--cp-border); border-radius: 6px; font-size: 11px; padding: 8px 10px; display: inline-flex; gap: 6px; align-items: center; min-height: 36px; }
 .save-button .icon { width: 14px; height: 14px; }
 .save-button:hover, .save-button[aria-pressed="true"] { color: var(--cp-accent); border-color: var(--cp-accent); background: var(--cp-accent-soft); }
+.calendar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.calendar-actions .save-button { font-size: 11px; }
+.calendar-actions .icon { width: 14px; height: 14px; }
+.calendar-unavailable { font-size: 10px; color: var(--cp-text-soft); }
+.session-card > .calendar-actions { width: 100%; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--cp-border); }
+.step-card > .calendar-actions, .agenda-item-body > .calendar-actions { margin-top: 12px; }
+.occurrence > .calendar-actions { flex-basis: 100%; padding-top: 12px; border-top: 1px solid var(--cp-border); }
+.custom-step .calendar-actions { margin-bottom: 12px; }
+.custom-step > div { min-width: 0; }
+.guide-calendar { padding: 16px; background: var(--cp-accent-soft); border: 1px solid var(--cp-border); border-radius: .625rem; margin-block: 20px; }
+.calendar-help { margin-top: 12px; font-size: 11px; line-height: 1.7; color: var(--cp-text-muted); }
+.path-brief .guide-calendar > .button { width: 100%; }
 .load-more { display: flex; flex-direction: column; align-items: center; margin-top: 36px; gap: 12px; }
 .load-more > span { font-size: 10px; color: var(--cp-text-soft); }
 .empty-state { text-align: center; padding: 56px 24px; border: 1px dashed var(--cp-border-strong); border-radius: 16px; }
@@ -253,6 +265,69 @@ html:has(dialog[open]) { overflow: hidden; }
 #confirm-dialog h2 { font-size: 24px; font-weight: 500; margin-block: 8px 16px; }
 #confirm-dialog p { color: var(--cp-text-muted); font-size: 13px; }
 .confirm-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 28px; }
+/* Event identity, switcher, and discovery */
+.fixture-banner { margin: 0; padding: 8px 16px; text-align: center; font: 600 11px/1.5 Consolas, "Courier New", Courier, monospace; letter-spacing: 1px; text-transform: uppercase; background: var(--cp-warning); color: #1a1a1a; }
+.event-bar { background: var(--cp-bg-elevated); border-bottom: 1px solid var(--cp-border); }
+.event-bar-inner { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding-block: 12px; }
+.event-identity { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; min-width: 0; }
+.event-identity-name { font-size: 17px; font-weight: 600; letter-spacing: -.3px; color: var(--cp-text); }
+.event-identity-meta { font-size: 12px; color: var(--cp-text-muted); }
+.event-switcher { position: relative; display: flex; align-items: center; gap: 20px; flex: 0 0 auto; }
+.event-switcher summary { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border: 1px solid var(--cp-border); border-radius: .625rem; background: var(--cp-surface); font-size: 13px; font-weight: 600; cursor: pointer; list-style: none; }
+.event-switcher summary::-webkit-details-marker { display: none; }
+.event-switcher summary .icon { width: 16px; height: 16px; transform: rotate(90deg); transition: transform .15s; }
+.event-switcher details[open] summary { border-color: var(--cp-accent); color: var(--cp-accent); }
+.event-switcher details[open] summary .icon { transform: rotate(-90deg); }
+.event-switcher-list { position: absolute; right: 0; top: calc(100% + 8px); z-index: 11; width: min(360px, calc(100vw - 32px)); max-height: min(60vh, 420px); overflow-y: auto; margin: 0; padding: 8px; list-style: none; background: var(--cp-panel-strong); border: 1px solid var(--cp-border-strong); border-radius: .625rem; box-shadow: var(--cp-shadow); }
+.event-switcher-list a, .event-switcher-current { display: block; padding: 10px 12px; border-radius: 6px; color: var(--cp-text); }
+.event-switcher-list a:hover { background: var(--cp-accent-soft); color: var(--cp-accent); }
+.event-switcher-current { background: var(--cp-accent-soft); }
+.event-switcher-list strong { display: block; font-size: 13px; font-weight: 600; }
+.event-switcher-list small { display: block; font-size: 11px; color: var(--cp-text-muted); }
+.directory-hero { padding-block: 56px 24px; }
+.directory-hero .hero-description { margin-top: 24px; max-width: 620px; }
+.section-tight { padding-block: 40px; }
+.event-search { display: grid; gap: 8px; margin-bottom: 12px; max-width: 720px; }
+.event-search > label { font-size: 13px; font-weight: 600; }
+.event-search-row { display: flex; gap: 16px; align-items: center; }
+.event-search-row .search-field { border: 1px solid var(--cp-border-strong); border-radius: .625rem; padding-inline: 12px; background: var(--cp-surface); }
+.event-search-row .search-field:focus-within { border-color: var(--cp-accent); }
+.event-results { font-size: 12px; color: var(--cp-text-muted); margin-bottom: 20px; min-height: 1.6em; }
+.event-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 20px; margin: 0; padding: 0; list-style: none; }
+.event-card { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 24px; background: var(--cp-surface); border: 1px solid var(--cp-border-strong); border-radius: 16px; transition: border-color .15s, background .15s, transform .15s; }
+.event-card:hover, .event-card:focus-within { border-color: var(--cp-accent); background: var(--cp-accent-soft); }
+.event-card:hover { transform: translateY(-2px); }
+.event-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 22px; }
+.event-card-top .session-code { margin-left: auto; }
+.event-card h3 { font-size: 26px; font-weight: 500; letter-spacing: -.8px; }
+.event-card-link { color: var(--cp-text); }
+.event-card-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.event-card-link:focus-visible { outline: none; }
+.event-card-link:focus-visible::after { outline: 3px solid var(--cp-accent); outline-offset: 4px; }
+.event-card-dates { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.event-card-dates .icon { width: 16px; height: 16px; color: var(--cp-accent); }
+.event-card-summary { font-size: 13px; color: var(--cp-text-muted); }
+.event-card-action { margin-top: auto; padding-top: 8px; color: var(--cp-accent); font-size: 12px; font-weight: 600; }
+.journey-choices { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.segmented { flex-wrap: wrap; }
+.footer-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 11px; }
+.footer-actions .text-link { font-size: 11px; }
+.telemetry-status { color: var(--cp-text-muted); }
+.telemetry-status:empty { display: none; }
+.cookie-banner:empty { display: none; }
+@media (max-width: 800px) {
+  .event-bar-inner { flex-direction: column; align-items: stretch; gap: 12px; }
+  .event-switcher { justify-content: space-between; }
+  .event-switcher-list { left: 0; right: auto; }
+}
+@media (max-width: 600px) {
+  .directory-hero { padding-block: 32px 8px; }
+  .section-tight { padding-block: 28px; }
+  .event-card { padding: 20px; border-radius: .625rem; }
+  .event-card h3 { font-size: 22px; }
+  .event-search-row { flex-direction: column; align-items: stretch; gap: 8px; }
+}
+
 @media (max-width: 1100px) {
   .container { width: calc(100% - 64px); }
   h1 { font-size: 56px; }
@@ -339,6 +414,6 @@ html:has(dialog[open]) { overflow: hidden; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 @media print {
-  .site-header, .journey-hero, #guide, #my-guide, #catalog, .about-strip, .site-footer, .agenda-controls, .agenda-empty, .toast, dialog, .agenda-item > .icon-button { display: none !important; }
+  .fixture-banner, .event-bar, .cookie-banner, .site-header, .journey-hero, #guide, #my-guide, #catalog, .about-strip, .site-footer, .agenda-controls, .agenda-empty, .toast, dialog, .agenda-item > .icon-button { display: none !important; }
   .container { width: 100%; }.section { padding: 0; }#agenda .section-heading > p { display: none; }.agenda-item { break-inside: avoid; }
 }

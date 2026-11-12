@@ -1,31 +1,26 @@
+{{- $manifest := partialCached "events/manifest.html" "manifest" "manifest" -}}
+{{- $telemetry := partial "telemetry-state.html" . -}}
+{{- $published := partialCached "events/published.html" "published" -}}
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  {{ partial "theme.html" . }}
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="{{ site.Params.description }}">
-  <title>{{ site.Title }}</title>
-  {{ $styles := resources.Get "css/main.css" | minify | fingerprint "sha256" }}
-  <link rel="stylesheet" href="{{ $styles.RelPermalink }}" integrity="{{ $styles.Data.Integrity }}">
-  {{ $catalog := partial "catalog.html" . }}
-  <link rel="preload" href="{{ $catalog.RelPermalink }}" as="fetch" crossorigin>
-  <link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">
+  {{ partial "head.html" (dict "title" site.Title "description" site.Params.description "preload" (slice $manifest.resource.RelPermalink)) }}
+  {{ partial "telemetry-config-script.html" $telemetry }}
 </head>
-<body data-catalog="{{ $catalog.RelPermalink }}">
+<body class="directory-page" data-events="{{ $manifest.resource.RelPermalink }}" data-home="{{ site.Home.RelPermalink }}">
   {{ partial "icons.html" . }}
   <a class="skip-link" href="#main">Skip to content</a>
+  {{- if site.Params.fixturePreview }}
+  <p class="fixture-banner" role="note">Fixture preview: test events only. Not production content.</p>
+  {{- end }}
   <header class="site-header">
     <div class="header-inner container">
-      <a class="brand" href="#top" aria-label="Ignite Field Guide home">
+      <a class="brand" href="{{ site.Home.RelPermalink }}" aria-label="Events Guide home">
         <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-        <span>ignite<span class="brand-divider">/</span><strong>field guide</strong><small>2026</small></span>
+        <span>events<span class="brand-divider">/</span><strong>guide</strong></span>
       </a>
       <nav class="main-nav" aria-label="Main navigation">
-        <a href="#guide">Your path</a>
-        <a href="#catalog">Session catalog</a>
-        <a href="#my-guide">Create a guide</a>
-        <a href="#agenda" class="agenda-nav">My agenda <span id="nav-saved-count">0</span></a>
+        <a href="#events">All events</a>
       </nav>
       <button id="theme-toggle" class="icon-button" aria-label="Switch color theme" title="Switch color theme">
         <svg class="icon" aria-hidden="true"><use href="#i-sun"></use></svg>
@@ -33,179 +28,66 @@
     </div>
   </header>
   <main id="main">
-    <section id="top" class="journey-hero container" aria-label="Choose your Ignite journey">
-      <div class="journey-intro">
-        <div>
-          <p class="eyebrow"><span class="live-dot"></span> Microsoft Ignite 2026 <span class="eyebrow-divider">/</span> An independent guide</p>
-          <h1>Your 2026 Ignite.<span>Your <em>next move.</em></span></h1>
-        </div>
-        <p class="hero-description">Know <strong>what to attend, why it matters, and in what order.</strong> Start with a curated journey, or build a guide your team can share.</p>
-      </div>
-      <div class="journey-choices">
-        <a href="#guide" class="journey-entry" data-entry="startup">
-          <div class="journey-entry-top"><span class="badge badge-accent">PRE-BUILT JOURNEY</span><span class="session-code">01 / LAUNCH</span></div>
-          <h2>Startup <svg class="icon" aria-hidden="true"><use href="#i-arrow-up"></use></svg></h2>
-          <p>From idea to market. Ship a product, not a platform project.</p>
-          <span class="journey-sequence">Position &rarr; Build &rarr; Ship &rarr; Protect</span>
-          <span class="journey-entry-action">Explore 6 ordered sessions <span aria-hidden="true">&rarr;</span></span>
-        </a>
-        <a href="#guide" class="journey-entry" data-entry="digital-native">
-          <div class="journey-entry-top"><span class="badge badge-accent">PRE-BUILT JOURNEY</span><span class="session-code">02 / SCALE</span></div>
-          <h2>Digital Native <svg class="icon" aria-hidden="true"><use href="#i-arrow-up"></use></svg></h2>
-          <p>Scale without the sprawl. Build a platform that grows with you.</p>
-          <span class="journey-sequence">Standardize &rarr; Observe &rarr; Secure &rarr; Scale</span>
-          <span class="journey-entry-action">Explore 6 ordered sessions <span aria-hidden="true">&rarr;</span></span>
-        </a>
-        <a href="#my-guide" class="journey-entry journey-entry-custom" data-entry="custom">
-          <div class="journey-entry-top"><span class="badge">YOUR OWN EDITION</span><span class="session-code">03 / SHARE</span></div>
-          <h2>Build your own <svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg></h2>
-          <p>Your picks. Your order. Your reasons. One guide to share with others.</p>
-          <span class="journey-sequence">Pick &rarr; Order &rarr; Add your why &rarr; Share</span>
-          <span class="journey-entry-action">Create a guide &amp; share a link <span aria-hidden="true">&rarr;</span></span>
-        </a>
-      </div>
-      <div class="journey-meta">
-        <p><strong id="session-count">&mdash;</strong> sessions. Three curated paths. Your own point of view.</p>
-        <a class="text-link" href="#catalog">Browse the full catalog <span aria-hidden="true">&nearr;</span></a>
-      </div>
+    <section id="top" class="directory-hero container" aria-labelledby="directory-title">
+      <p class="eyebrow"><span class="live-dot"></span> Events Guide <span class="eyebrow-divider">/</span> Independent session guides</p>
+      <h1 id="directory-title">Find your event.<span>Plan your <em>next move.</em></span></h1>
+      <p class="hero-description">Pick an event to get <strong>curated session paths, a searchable catalog, and a guide you can share.</strong> Each event keeps its own agenda and drafts in this browser.</p>
     </section>
 
-    <div class="loading-notice container" id="loading-notice" role="status">Preparing your field guide&hellip;</div>
-    <div class="error-notice container" id="load-error" role="alert" hidden>
-      <h2>The catalog could not be loaded.</h2><p id="load-error-message"></p><button class="button" id="retry-load">Try again</button>
+    <div id="route-status" class="loading-notice container" role="status" hidden></div>
+    <div id="route-error" class="error-notice container" role="alert" tabindex="-1" hidden>
+      <h2>This link could not be opened.</h2>
+      <p id="route-error-message"></p>
+      <a class="button" href="{{ site.Home.RelPermalink }}">Browse all events</a>
     </div>
-    <noscript><p class="notice container">This guide needs JavaScript for session search and your saved agenda. Enable it and reload. The original source is <code>2026_ignite_session_catalog.json</code>.</p></noscript>
 
-    <div id="app-content" hidden>
-      <section id="guide" class="section container">
-        <div class="section-heading">
-          <div><p class="eyebrow">01 / MAKE IT RELEVANT</p><h2>A path, not another list.</h2></div>
-          <p>Six intentional stops. A clear reason for each.<br>Choose the outcome you want to bring home.</p>
-        </div>
-        <div class="audience-control">
-          <span>I'm building at a</span>
-          <div class="segmented" role="group" aria-label="Company stage">
-            <button type="button" data-audience="startup" aria-pressed="true">Startup</button>
-            <button type="button" data-audience="digital-native" aria-pressed="false">Digital-native company</button>
-          </div>
-        </div>
-        <div class="path-options" id="path-options" role="group" aria-label="Choose a learning path"></div>
-        <div class="path-workspace">
-          <aside class="path-brief">
-            <p class="eyebrow" id="path-label"></p>
-            <h3 id="path-headline"></h3>
-            <p id="path-description"></p>
-            <div class="path-fit"><span>BUILT FOR</span><strong id="path-fit"></strong></div>
-            <div class="path-outcome"><svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg><p id="path-outcome"></p></div>
-            <button class="button button-primary" id="save-path"><svg class="icon" aria-hidden="true"><use href="#i-bookmark"></use></svg>Save this path</button>
-            <button class="button customize-path" id="customize-path"><svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg>Make this path your own</button>
-            <button class="text-link" id="browse-path">See these in the catalog <span aria-hidden="true">&rarr;</span></button>
-            <p class="small-print">This is a <strong>learning order</strong>, not a live timetable. Some sessions overlap. Save your picks, then resolve conflicts in your agenda.</p>
-          </aside>
-          <ol class="path-steps" id="path-steps"></ol>
-        </div>
-      </section>
+    <section id="highlights" class="section-tight container" aria-labelledby="highlights-heading" hidden>
+      <div class="section-heading">
+        <div><p class="eyebrow">NOW AND NEXT</p><h2 id="highlights-heading">Happening now and coming up.</h2></div>
+      </div>
+      <ul id="highlights-list" class="event-grid" role="list"></ul>
+      <p id="highlights-empty" class="notice" hidden>No events are in progress or coming up. Past event guides stay available below.</p>
+    </section>
 
-      <section id="my-guide" class="section guide-builder-section">
-        <div class="container">
-          <div class="section-heading">
-            <div><p class="eyebrow">YOUR EDITION / BUILT TO BE SHARED</p><h2>A guide with your point of view.</h2></div>
-            <p>Pick the sessions. Set the order. Add your why.<br>One link brings everyone to the same guide.</p>
-          </div>
-          <div id="shared-guide" class="shared-guide" hidden>
-            <div class="builder-top"><span class="badge badge-accent">SHARED GUIDE &middot; SNAPSHOT</span><button class="button" id="edit-shared"><svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg>Edit a copy</button></div>
-            <h3 id="shared-guide-title"></h3><p id="shared-guide-summary"></p>
-            <ol id="shared-guide-steps" class="custom-steps"></ol>
-            <div class="shared-actions"><button class="button button-primary" id="save-shared-agenda">Save available sessions to my agenda</button><button class="text-link" id="show-draft">Back to my draft <span aria-hidden="true">&rarr;</span></button></div>
-            <p class="small-print">This is the author's saved snapshot, not a live schedule. Session facts may have changed since it was shared. Verify availability in the official catalog. Editing a copy does not change this link.</p>
-          </div>
-          <div id="guide-editor" class="guide-editor">
-            <div class="builder-top"><span class="badge badge-accent">YOUR DRAFT &middot; SAVED IN THIS BROWSER</span><span id="draft-count" class="session-code">0 / 20 SESSIONS</span></div>
-            <div class="builder-fields">
-              <label>Give your guide a name<input id="guide-title" maxlength="100" placeholder="e.g. Our team's AI-to-production playbook"></label>
-              <label>Who is it for, and what should they leave with?<textarea id="guide-summary" maxlength="600" rows="2" placeholder="Set the context for the people you share this with."></textarea></label>
-            </div>
-            <ol id="draft-steps" class="custom-steps"></ol>
-            <div id="draft-empty" class="draft-empty"><svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg><p>Your guide, your sequence. Add sessions from the catalog, or start with a built-in path.</p><div><a class="text-link" href="#catalog">Find sessions <span aria-hidden="true">&rarr;</span></a><button class="text-link" id="start-from-path">Use the selected path <span aria-hidden="true">&rarr;</span></button></div></div>
-            <div class="builder-actions"><a class="button" href="#catalog"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>Add sessions</a><button class="text-link" id="clear-draft">Clear draft</button><button class="button button-primary" id="share-guide"><svg class="icon" aria-hidden="true"><use href="#i-arrow-up"></use></svg>Create share link</button></div>
-            <div id="share-result" class="share-result" hidden>
-              <label>Your guide's permalink<input id="share-url" type="url" readonly></label><button class="button" id="copy-guide-link">Copy link</button><a id="open-guide-link" class="text-link" target="_blank" rel="noopener noreferrer">Open shared view &nearr;</a>
-              <p>This link is a snapshot. Later edits need a new link. Anyone with the URL can read its contents&mdash;don't include private information.</p>
-            </div>
-            <p class="small-print">No account, database, or sign-in. Your share link carries the guide itself, including session facts and your notes. Up to 20 sessions; very long guides may need shorter notes to fit in a link. Shared links work while this site remains available.</p>
-          </div>
-          <p id="guide-message" class="notice" role="status" hidden></p>
+    <section id="events" class="section-tight container" aria-labelledby="events-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">ALL EVENTS</p><h2 id="events-heading">Every event guide.</h2></div>
+        <p>{{ len $manifest.events }} event{{ if ne (len $manifest.events) 1 }}s{{ end }}, including archived past events.</p>
+      </div>
+      <form id="event-search" class="event-search" role="search" aria-label="Events" hidden>
+        <label for="event-query">Search events</label>
+        <div class="event-search-row">
+          <span class="search-field"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg><input id="event-query" type="search" autocomplete="off" placeholder="Event name, place, or topic&hellip;" aria-describedby="event-results"></span>
+          <button type="button" class="button" id="event-search-clear">Clear</button>
         </div>
-      </section>
-
-      <section id="catalog" class="catalog-section section">
-        <div class="container">
-          <div class="section-heading">
-            <div><p class="eyebrow">02 / FOLLOW YOUR CURIOSITY</p><h2>The session catalog.</h2></div>
-            <p>Go deeper. Make a detour.<br>Your next good idea might not be on the path.</p>
-          </div>
-          <form id="catalog-filters" class="catalog-filters" role="search" aria-label="Filter sessions">
-            <div class="search-row">
-              <label class="search-field"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg><span class="sr-only">Search sessions</span><input id="search" type="search" placeholder="Search a topic, product, speaker, or session code&hellip;" autocomplete="off"></label>
-              <label class="sort-field"><span>Sort by</span><select id="sort"><option value="recommended">Guide picks first</option><option value="time">Soonest first</option><option value="title">Title A&ndash;Z</option></select></label>
-            </div>
-            <div class="filter-grid">
-              <label>Topic<select id="topic"><option value="">All topics</option></select></label>
-              <label>Format<select id="type"><option value="">All formats</option></select></label>
-              <label>Level<select id="level"><option value="">All levels</option></select></label>
-              <label>Attendance<select id="delivery"><option value="">In-person + online</option></select></label>
-              <label>Day<select id="day"><option value="">Any day</option><option value="unscheduled">Time not listed</option></select></label>
-              <label>Learning path<select id="path-filter"><option value="">All sessions</option></select></label>
-            </div>
-          </form>
-          <div class="catalog-toolbar">
-            <p id="results-count" role="status" aria-live="polite"></p>
-            <div class="toolbar-actions"><button class="text-link" id="reset-filters">Reset filters</button><button class="text-link" id="share-filters">Copy view link <svg class="icon" aria-hidden="true"><use href="#i-arrow-up"></use></svg></button></div>
-          </div>
-          <div id="session-grid" class="session-grid"></div>
-          <div id="catalog-empty" class="empty-state" hidden><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg><h3>No sessions on this detour.</h3><p>Try a broader search or remove a filter.</p><button class="button" id="empty-reset">Reset filters</button></div>
-          <div class="load-more"><button class="button" id="load-more">Show more sessions <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg></button><span id="shown-count"></span></div>
-        </div>
-      </section>
-
-      <section id="agenda" class="section container">
-        <div class="section-heading">
-          <div><p class="eyebrow">03 / MAKE IT YOURS</p><h2>Your time, well spent.</h2></div>
-          <p>A personal shortlist, saved in this browser.<br>Not a booking or an official event registration.</p>
-        </div>
-        <div class="agenda-controls">
-          <label class="timezone-label">Display times in<select id="timezone"><option value="America/Los_Angeles">Pacific &middot; event time</option><option value="local">My local time</option><option value="UTC">UTC</option></select></label>
-          <div class="toolbar-actions"><button id="clear-agenda" class="text-link">Clear agenda</button><button class="button" id="export-calendar"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>Export calendar (.ics)</button></div>
-        </div>
-        <div id="storage-warning" class="notice" role="status" hidden></div>
-        <div id="agenda-summary" class="agenda-summary" role="status" aria-live="polite"></div>
-        <div id="agenda-list"></div>
-        <div id="agenda-empty" class="agenda-empty">
-          <span class="empty-bookmark"><svg class="icon" aria-hidden="true"><use href="#i-bookmark"></use></svg></span>
-          <div><h3>A good plan starts with one session.</h3><p>Save a whole path or bookmark a few interesting stops. We'll keep the details together and flag any overlapping times.</p><a class="text-link" href="#guide">Find your first stop <span aria-hidden="true">&rarr;</span></a></div>
-          <span class="empty-index" aria-hidden="true">YOUR<br>NEXT<br>MOVE.</span>
-        </div>
-        <p class="agenda-footnote">Calendar export includes only sessions with a start and end time. Saving here does not reserve a seat. Verify times and availability in the <a href="https://ignite.microsoft.com/en-US/sessions" target="_blank" rel="noopener noreferrer">official Ignite catalog <span aria-hidden="true">&nearr;</span></a>.</p>
-      </section>
-
-      <section class="about-strip container" aria-label="About this guide">
-        <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
-        <div><h2>Curated for builders. Grounded in the catalog.</h2><p>Session facts come from the supplied local catalog; path order, reasons, and takeaways are independent editorial recommendations, not official Microsoft guidance. <span id="source-summary"></span> Missing schedules stay missing. Online attendance does not imply a recording.</p></div>
-      </section>
-    </div>
+      </form>
+      <p id="event-results" class="event-results" role="status" aria-live="polite"></p>
+      {{- if $published }}
+      <ul id="event-list" class="event-grid" role="list">
+        {{- range $published }}
+        {{- $event := partialCached "events/metadata.html" . .File.ContentBaseName }}
+        <li class="event-card" data-event-card data-event-id="{{ $event.id }}">
+          <p class="event-card-top"><span class="badge" data-event-status hidden></span><span class="session-code">{{ $event.timeZoneAbbreviation }} &middot; {{ $event.timeZone }}</span></p>
+          <h3><a class="event-card-link" href="{{ .RelPermalink }}" data-event-id="{{ $event.id }}" data-event-source="directory">{{ $event.name }}</a></h3>
+          <p class="event-card-dates"><svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg><time datetime="{{ $event.startDate }}">{{ partial "events/date-range.html" $event }}</time></p>
+          <p class="event-card-summary">{{ $event.summary }}</p>
+          <span class="event-card-action" aria-hidden="true">Open event guide &rarr;</span>
+        </li>
+        {{- end }}
+      </ul>
+      {{- else }}
+      <p class="notice">No event guides are published yet.</p>
+      {{- end }}
+      <div id="event-empty" class="empty-state" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+        <h3>No events match your search.</h3>
+        <p>Try a different name, place, or topic.</p>
+        <button type="button" class="button" id="event-empty-reset">Show all events</button>
+      </div>
+    </section>
   </main>
-  <footer class="site-footer container"><a class="brand footer-brand" href="#top">ignite <span class="brand-divider">/</span> field guide <small>2026</small></a><p>For the teams building what comes next.</p><a class="text-link" href="#top">Back to top &uarr;</a></footer>
-
-  <dialog id="session-dialog" aria-labelledby="dialog-title">
-    <div class="dialog-top"><span class="eyebrow">YOUR SESSION BRIEF</span><button id="close-dialog" class="icon-button" aria-label="Close session details"><svg class="icon" aria-hidden="true"><use href="#i-close"></use></svg></button></div>
-    <div id="dialog-content"></div>
-  </dialog>
-  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
-    <h2 id="confirm-title">Clear your saved agenda?</h2><p>This removes every saved session from this browser. It won't change any official event bookings.</p>
-    <div class="confirm-actions"><button class="button" id="cancel-clear">Keep my sessions</button><button class="button button-primary" id="confirm-clear">Clear agenda</button></div>
-  </dialog>
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  {{ $app := resources.Get "js/app.js" | js.Build (dict "target" "es2020" "format" "esm" "minify" true) | fingerprint "sha256" }}
-  <script type="module" src="{{ $app.RelPermalink }}" integrity="{{ $app.Data.Integrity }}"></script>
+  {{ partial "site-footer.html" (dict "telemetry" $telemetry "backToTop" false) }}
+  {{ $directory := resources.Get "js/directory.js" | js.Build (dict "target" "es2020" "format" "esm" "minify" true "defines" $telemetry.defines) | fingerprint "sha256" }}
+  <script type="module" src="{{ $directory.RelPermalink }}" integrity="{{ $directory.Data.Integrity }}"></script>
 </body>
 </html>

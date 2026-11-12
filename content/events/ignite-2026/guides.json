@@ -1,0 +1,302 @@
+{
+  "audiences": [
+    {
+      "id": "startup",
+      "label": "Startup"
+    },
+    {
+      "id": "digital-native",
+      "label": "Digital-native company"
+    }
+  ],
+  "paths": [
+    {
+      "id": "launch",
+      "name": "From idea to market",
+      "audience": "startup",
+      "label": "The startup product path",
+      "headline": "Ship a product. Not a platform project.",
+      "description": "For founders and small teams turning an idea into a sellable product. Connect product differentiation and Marketplace distribution to lean runtime, data, and delivery choices.",
+      "outcome": "Leave with a product architecture, a faster delivery loop, and a route to market.",
+      "fit": "Founders · CTOs · early-stage builders",
+      "steps": [
+        {
+          "code": "BRK447",
+          "stage": "Connect product and distribution",
+          "why": "Start with product differentiation and distribution, not a shopping list of services. This session connects AI-powered products to Microsoft Marketplace and commercial programs; assess whether that route fits your customers.",
+          "takeaway": "Write one differentiation hypothesis and decide whether Marketplace fits your sales motion."
+        },
+        {
+          "code": "BRK423",
+          "stage": "Choose a lean foundation",
+          "why": "App Service, Container Apps, and Functions are shown with event-driven scale and built-in governance. Use these managed options to scope what a small team actually needs to operate.",
+          "takeaway": "Shortlist a runtime and the operational work it lets your team avoid."
+        },
+        {
+          "code": "BRK366",
+          "stage": "Choose data for the job",
+          "why": "Experts explore relational, NoSQL, and open-source options in Azure Databases. Start from your product's access patterns instead of adopting an AI-specific data architecture by default.",
+          "takeaway": "Choose a candidate database against your consistency, query, and growth requirements."
+        },
+        {
+          "code": "BRK270",
+          "stage": "Shorten the shipping loop",
+          "why": "Watch a feature move from prompt to merged pull request using parallel coding agents. Focus on the review and validation steps that keep a small team in control.",
+          "takeaway": "Pick one repeatable development task to automate, with a named human review gate."
+        },
+        {
+          "code": "BRK278",
+          "stage": "Keep review deliberate",
+          "why": "See how Copilot code review uses context, coding standards, and review effort levels with different cost-quality tradeoffs. Decide what assistance helps your small team without surrendering release approval.",
+          "takeaway": "Set a review rule for agent-generated changes and identify where deeper review is warranted."
+        },
+        {
+          "code": "BRK271",
+          "stage": "Make velocity affordable",
+          "why": "Agent-assisted development has an operating cost. Learn how model choices, workflows, Actions, and adoption reports affect your GitHub Copilot investment; this is not a general Azure FinOps session.",
+          "takeaway": "Set a Copilot spending budget and define an adoption metric worth tracking."
+        }
+      ]
+    },
+    {
+      "id": "ai",
+      "name": "Your first AI product",
+      "audience": "startup",
+      "label": "The startup AI path",
+      "headline": "Own less. Prove the useful part.",
+      "description": "For small teams building a first agent-powered feature, not an enterprise AI estate. Choose what to own, connect one useful workflow to knowledge and state, and set evaluation and inference budgets.",
+      "outcome": "Leave with a scoped prototype, an evaluation plan, and a quality-cost-latency target.",
+      "fit": "Startup AI engineers · technical founders · product leads",
+      "steps": [
+        {
+          "code": "BRK243",
+          "stage": "Decide what to own",
+          "why": "Choose between Foundry prompt agents, the Microsoft Copilot harness, and hosted agents before committing to a framework. Match ownership and control to your first feature, not the most elaborate demo.",
+          "takeaway": "Document your build-versus-managed choice and one condition that would change it."
+        },
+        {
+          "code": "BRK240",
+          "stage": "Build the end-to-end loop",
+          "why": "Foundry links local GitHub and VS Code development to hosted deployment, tools, grounding, and evaluation. Use this end-to-end journey to scope one customer workflow rather than a platform backlog.",
+          "takeaway": "Define one user request, tool action, and observable success condition for your prototype."
+        },
+        {
+          "code": "BRK300",
+          "stage": "Ground it in real knowledge",
+          "why": "See the retrieval loop built by hand before comparing it with Foundry IQ. Understanding the plumbing makes the managed-service tradeoff a deliberate choice.",
+          "takeaway": "Choose a retrieval approach and name the evidence your agent must cite."
+        },
+        {
+          "code": "BRK367",
+          "stage": "Keep product state deliberate",
+          "why": "For a feature needing memory or live application data, this session shows Cosmos DB patterns for state, conversation history, and retrieval. Decide what your first release must persist rather than using those patterns to justify a multi-agent system.",
+          "takeaway": "Sketch the minimum state and retrieval model and test whether Cosmos DB fits its access patterns."
+        },
+        {
+          "code": "BRK249",
+          "stage": "Measure the useful result",
+          "why": "Foundry connects traces, evaluations, and optimization into a repeatable improvement loop. Replace demo impressions with a small test set and measurable quality and cost signals.",
+          "takeaway": "Define a small evaluation set, a release threshold, and a trace to inspect when a test fails."
+        },
+        {
+          "code": "BRK247",
+          "stage": "Budget the first release",
+          "why": "Foundry's model and inference-tier choices, prompt caching, routing, and capacity fallbacks affect production token economics. Apply those levers to one feature before buying or building more infrastructure.",
+          "takeaway": "Set a per-workflow inference budget and quality-latency limits for comparing model choices."
+        }
+      ]
+    },
+    {
+      "id": "startup-ops",
+      "name": "Run lean in production",
+      "audience": "startup",
+      "label": "The startup operations path",
+      "headline": "Protect customers. Keep the footprint small.",
+      "description": "For a small team taking responsibility for a live service. Focus on managed runtime sizing, delivery security, health signals, recovery, and cloud spend without adopting fleet-management complexity.",
+      "outcome": "Leave with a lightweight production checklist, a recovery exercise, and a recurring cost review.",
+      "fit": "Startup CTOs · founding engineers · small on-call teams",
+      "steps": [
+        {
+          "code": "LTG1293",
+          "stage": "Bound the runtime footprint",
+          "why": "Container Apps patterns cover scale-to-zero, cold starts, CPU and memory sizing, and per-second billing. Start with one service's resource envelope rather than a cluster or fleet.",
+          "takeaway": "Set initial CPU and memory limits and a cold-start tolerance for a Container Apps workload."
+        },
+        {
+          "code": "BRK286",
+          "stage": "Secure the shipping boundary",
+          "why": "GitHub Actions workflows can expose credentials and production access through unsafe pull-request triggers, floating dependencies, and excessive permissions. Use the attack-path demos to harden the pipeline a small team already has.",
+          "takeaway": "Audit workflow permissions, action pinning, and the trust boundary for pull requests."
+        },
+        {
+          "code": "BRK416",
+          "stage": "Watch one critical journey",
+          "why": "Azure Monitor brings infrastructure, application, and agent observability together. Narrow that broad view to the customer journey your team must diagnose quickly instead of collecting dashboards without a response plan.",
+          "takeaway": "Map one critical journey to its health signals and a named first responder."
+        },
+        {
+          "code": "BRK445",
+          "stage": "Plan for a small service to fail",
+          "why": "Identify critical dependencies, validate recovery readiness, and design for failure across apps and infrastructure. Apply those practices to your few customer-critical components, not a multi-region estate by default.",
+          "takeaway": "Write one dependency-failure scenario and the recovery steps your team will rehearse."
+        },
+        {
+          "code": "LTG1284",
+          "stage": "Prove the data can return",
+          "why": "Azure Backup connects protection and recovery options to application criticality and business needs. Confirm workload support and a recoverability target before adopting advanced recovery features.",
+          "takeaway": "Verify backup support for your data services and schedule a restore test with a recovery target."
+        },
+        {
+          "code": "THR895",
+          "stage": "Make cloud cost a routine",
+          "why": "Cloud-cost investigation and estimation are shown through Azure Copilot, GitHub Copilot, and coding agents. Use the idle-resource and pre-release forecasting examples for a lightweight workload-spend review.",
+          "takeaway": "Assign an owner to a recurring cloud-cost review and one idle-resource cleanup."
+        }
+      ]
+    },
+    {
+      "id": "scale",
+      "name": "Scale without the sprawl",
+      "audience": "digital-native",
+      "label": "The digital-native platform path",
+      "headline": "Grow the business. Not the operational burden.",
+      "description": "For platform teams with production customers and established estates. Start with failure modes, then examine AKS fleets, PostgreSQL operations, system-wide observability, and bounded operational automation.",
+      "outcome": "Leave with a focused platform backlog for recovery readiness, consistent operations, and lower toil.",
+      "fit": "Platform teams · SREs · AKS and PostgreSQL operators",
+      "steps": [
+        {
+          "code": "BRK445",
+          "stage": "Map end-to-end failure modes",
+          "why": "Resilience spans compute, storage, networking, and applications rather than a single service's availability. Use the dependency and recovery-readiness practices to locate gaps in an established production architecture.",
+          "takeaway": "Prioritize one cross-service failure mode and the recovery evidence your platform is missing."
+        },
+        {
+          "code": "BRK421",
+          "stage": "Standardize the fleet",
+          "why": "If you already operate Kubernetes across environments, examine fleet management before multiplying bespoke clusters. This is a scale-out session, not a reason to adopt Kubernetes from scratch.",
+          "takeaway": "Identify one fleet-wide policy and one repeated operation to standardize."
+        },
+        {
+          "code": "BRK368",
+          "stage": "Make the data tier resilient",
+          "why": "Explore PostgreSQL fleet management, compute, storage, and immutable backups through production lessons. Prioritize this step if PostgreSQL is part of your stack.",
+          "takeaway": "Review your recovery objectives and one database performance or cost bottleneck."
+        },
+        {
+          "code": "BRK416",
+          "stage": "See the whole system",
+          "why": "Connect infrastructure, application, and AI-agent observability instead of adding another isolated dashboard. Start with the signals that shorten investigations for your team.",
+          "takeaway": "Map a critical user journey to the health signals needed to diagnose it."
+        },
+        {
+          "code": "BRK437",
+          "stage": "Challenge disruption assumptions",
+          "why": "Real incident learnings connect reliability principles to preparation, response, and recovery from force majeure events. Use those cases to challenge failure assumptions beyond routine component incidents.",
+          "takeaway": "Choose a severe-disruption scenario and identify the response or recovery assumption to test."
+        },
+        {
+          "code": "BRK417",
+          "stage": "Reduce toil deliberately",
+          "why": "Explore an AI SRE teammate only after the platform has useful telemetry and clear operational boundaries. Look for repetitive investigations, not reasons to remove human accountability.",
+          "takeaway": "Choose one low-risk operational workflow with an approval and rollback plan."
+        }
+      ]
+    },
+    {
+      "id": "ai-scale",
+      "name": "Operate AI at scale",
+      "audience": "digital-native",
+      "label": "The digital-native AI path",
+      "headline": "Many agents. One accountable operating model.",
+      "description": "For teams already operating agents across products and frameworks. Bring the estate under consistent governance, enforce runtime boundaries, and improve fleet reliability and token economics.",
+      "outcome": "Leave with an AI fleet-control plan, measurable service signals, and an optimization experiment.",
+      "fit": "AI platform teams · AI SREs · production AI owners",
+      "steps": [
+        {
+          "code": "BRK250",
+          "stage": "Unify without a rewrite",
+          "why": "Start from agents teams have already built in different frameworks. This session distinguishes open-source controls from Foundry's enterprise identity, policy, and estate-wide quality capabilities, including lock-in tradeoffs.",
+          "takeaway": "Inventory agent frameworks and identify which controls can be shared without rewriting them."
+        },
+        {
+          "code": "BRK253",
+          "stage": "Assign fleet-level controls",
+          "why": "Foundry connects agent identity, Responsible AI controls, AI Gateway, FinOps, and Agent 365 integrations for enterprise operations. Turn that control map into responsibilities across the teams running your AI estate.",
+          "takeaway": "Assign owners for agent identity, policy exceptions, usage budgets, and production incidents."
+        },
+        {
+          "code": "BRK425",
+          "stage": "Enforce runtime policy",
+          "why": "AI Gateway applies centralized controls across models, tools, MCP servers, applications, and agents. Examine traffic, cost, usage, and policy enforcement as runtime concerns rather than relying on each product team's conventions.",
+          "takeaway": "Define a gateway policy for one shared AI interaction and the usage evidence needed to audit it."
+        },
+        {
+          "code": "BRK448",
+          "stage": "Contain code execution",
+          "why": "Container Apps provides microVM isolation, identity, governance, and observability for production agent loops. Use that platform design to separate untrusted execution from shared services and tenant boundaries.",
+          "takeaway": "Specify an execution isolation boundary, allowed identity, and telemetry requirements for a code-running agent."
+        },
+        {
+          "code": "BRK251",
+          "stage": "Measure the fleet continuously",
+          "why": "Foundry combines tracing, evaluations, human feedback, and optimization with a production customer story. Focus on quality, reliability, latency, safety, and cost across the fleet, not just one successful agent demo.",
+          "takeaway": "Define fleet health signals and an evaluation gate for promoting an agent or model change."
+        },
+        {
+          "code": "BRK247",
+          "stage": "Optimize quality-adjusted spend",
+          "why": "Model and inference-tier selection, caching, routing, and capacity fallbacks change production AI economics. Use the customer examples to test savings against your fleet's measured quality and latency, not token price alone.",
+          "takeaway": "Design one routing or caching experiment with cost, quality, latency, and fallback acceptance criteria."
+        }
+      ]
+    },
+    {
+      "id": "engineering-scale",
+      "name": "Scale the engineering system",
+      "audience": "digital-native",
+      "label": "The digital-native engineering path",
+      "headline": "More teams. Consistent delivery.",
+      "description": "For engineering organizations scaling human and agent-assisted delivery across repositories. Connect team workflows to enterprise policy, secure CI, code-quality governance, and development economics.",
+      "outcome": "Leave with a cross-team delivery standard, a remediation backlog, and measurable Copilot spending controls.",
+      "fit": "Engineering leaders · developer-platform teams · AppSec",
+      "steps": [
+        {
+          "code": "BRK289",
+          "stage": "Define the engineering system",
+          "why": "GitHub connects defining, delivering, and assessing software through governance, shared knowledge, and continuous feedback. Use that system view to locate handoff and accountability gaps across teams before adding more coding agents.",
+          "takeaway": "Map one cross-team delivery flow and identify its missing owner or feedback loop."
+        },
+        {
+          "code": "BRK268",
+          "stage": "Make team workflows repeatable",
+          "why": "Copilot can follow team instructions, connect tools, and take on work within existing development processes. Use the testing, review, and policy examples to establish a reusable team workflow rather than isolated individual setups.",
+          "takeaway": "Draft shared agent instructions with explicit testing and human-review requirements."
+        },
+        {
+          "code": "BRK290",
+          "stage": "Govern across teams",
+          "why": "The GitHub Enterprise admin journey covers model policies, managed settings, access, team customization, and spend. Reviewable configuration changes and agent activity data make governance an engineering process rather than an informal agreement.",
+          "takeaway": "Define an organization baseline and a pull-request process for team-specific policy exceptions."
+        },
+        {
+          "code": "BRK286",
+          "stage": "Harden shared CI boundaries",
+          "why": "Shared delivery systems multiply the impact of unsafe triggers, cache poisoning, floating action references, and over-permissioned credentials. Use the concrete GitHub Actions attack paths to set enforceable workflow standards across repositories.",
+          "takeaway": "Create a repository-wide CI-hardening backlog with owners for the highest-risk trust boundaries."
+        },
+        {
+          "code": "BRK287",
+          "stage": "Govern quality debt",
+          "why": "GitHub Code Quality links performance, maintainability, and reliability findings to engineering standards and agentic remediation. Treat quality debt across legacy and AI-generated code as a reviewable portfolio of work, not just more findings.",
+          "takeaway": "Choose one cross-repository quality standard and a bounded remediation campaign with human review."
+        },
+        {
+          "code": "BRK271",
+          "stage": "Measure development economics",
+          "why": "GitHub Copilot billing reports, budgets, alerts, and adoption trends connect model and agent choices to development spend. Compare team usage and underused capabilities without mistaking activity counts for delivered value or this session for general Azure FinOps.",
+          "takeaway": "Set Copilot budget alerts and pair a team adoption measure with a delivery outcome."
+        }
+      ]
+    }
+  ]
+}

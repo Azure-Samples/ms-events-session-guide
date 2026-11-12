@@ -1,22 +1,33 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 import {
   FILTER_DEFAULTS, createCatalog, filterCatalog, compareInstances, isScheduled,
   dateKey, getConflicts, readFilters, readViewState, writeFilters, restoreSaved, calendarExport,
+  calendarSessions, normalizeSearch,
+  getAudiencePaths, audienceRecommendations,
 } from "./catalog.js";
-import { GUIDE_LIMITS, snapshotSession, validateGuide, decodeGuide, createShareURL } from "./guides.js";
+import { GUIDE_LIMITS, snapshotSession, validateGuide, decodeGuide, createShareURL, getGuideEventId } from "./guides.js";
+import { LEGACY_EVENT, LEGACY_EVENT_ID } from "./event-context.js";
+import { eventStorageKeys, migrateLegacyStorage, withEventStorageLock, validateStoredDraft } from "./event-state.js";
+import { initializeTelemetry } from "./telemetry.js";
+import { preserveThemeForSiteLinks, validateManifest, wireEventLinks } from "./events.js";
 
 const $ = (id) => document.getElementById(id);
-const STORAGE = { agenda: "ignite-field-guide:agenda:v1", draft: "ignite-field-guide:draft:v1" };
+let storageKeys = eventStorageKeys(LEGACY_EVENT_ID);
 const PAGE_SIZE = 9;
 let catalog;
+let events = [];
+let telemetry;
 let filters = readFilters(location.search);
 let saved = new Set();
 let draft = newDraft();
 let sharedGuide = null;
 let viewingShared = false;
 let sharedViewRevision = 0;
-let audience = "startup";
-let activePath = "launch";
-let zoneChoice = "America/Los_Angeles";
+let audience = "";
+let activePath = "";
+let zoneChoice = LEGACY_EVENT.timeZone;
 let visibleCount = PAGE_SIZE;
 let dialogContext = null;
 let confirmCallback = null;
@@ -25,9 +36,15 @@ let shareRevision = 0;
 let draftRevision = 0;
 let initialized = false;
 let storageNotices = [];
+const unsavedStorageKeys = new Set();
+const storageRevisions = new Map();
 
 function newDraft() {
-  return { version: 1, title: "My Ignite guide", summary: "", steps: [] };
+  const event = catalog?.event || LEGACY_EVENT;
+  return {
+    version: 2, eventId: event.id,
+    title: `My ${event.name} guide`.slice(0, GUIDE_LIMITS.title), summary: "", steps: [],
+  };
 }
 
 function node(tag, className = "", text) {
@@ -85,11 +102,16 @@ function storageRead(key) {
 }
 
 function storageWrite(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch (error) {
+  const revision = (storageRevisions.get(key) || 0) + 1;
+  storageRevisions.set(key, revision);
+  unsavedStorageKeys.add(key);
+  withEventStorageLock(catalog.event.id, () => localStorage.setItem(key, value), {
+    onWarning: storageWarning,
+  }).then(() => {
+    if (storageRevisions.get(key) === revision) unsavedStorageKeys.delete(key);
+  }, (error) => {
     storageWarning(`Your changes could not be saved in this browser (${error.name}). Copy a guide share link before leaving; the agenda is not persistent.`);
-  }
+  });
 }
 
 function timeZone() {
@@ -128,11 +150,11 @@ function sessionTime(instance) {
 
 function updateURL() {
   const url = writeFilters(location.href, filters);
-  if (activePath === "launch") url.searchParams.delete("route");
+  if (activePath === getAudiencePaths(catalog.paths, audience)[0].id) url.searchParams.delete("route");
   else url.searchParams.set("route", activePath);
-  if (audience === "startup") url.searchParams.delete("audience");
+  if (audience === catalog.audiences[0].id) url.searchParams.delete("audience");
   else url.searchParams.set("audience", audience);
-  if (zoneChoice === "America/Los_Angeles") url.searchParams.delete("tz");
+  if (zoneChoice === catalog.event.timeZone) url.searchParams.delete("tz");
   else url.searchParams.set("tz", zoneChoice);
   history.replaceState(null, "", url);
 }
@@ -151,8 +173,75 @@ function selectedInstances() {
   return [...saved].map((id) => catalog.instanceById.get(id)).filter(Boolean);
 }
 
+function pathInstances(path) {
+  return path.steps.map((step) => catalog.byCode.get(step.code).instances[0]);
+}
+
+function downloadCalendar(instances, name, filename, source = "session") {
+  const scheduled = calendarSessions(instances);
+  if (!scheduled.length) {
+    announce("No calendar file was created: these sessions have no listed start and end time.");
+    return;
+  }
+  const slug = normalizeSearch(name).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "guide";
+  const blob = new Blob([calendarExport(scheduled, new Date(), name, catalog.event)], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = node("a");
+  link.href = url;
+  link.download = filename || `${catalog.event.id}-${slug}.ics`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const skipped = instances.filter((instance) => !isScheduled(instance)).length;
+  const overlaps = getConflicts(scheduled).size;
+  telemetry?.trackComposition("calendar_export_requested", scheduled, {
+    eventId: catalog.event.id, source, exportedCount: scheduled.length,
+    skippedCount: skipped, conflictCount: overlaps,
+  });
+  announce(`Calendar file ready: ${scheduled.length} session${scheduled.length === 1 ? "" : "s"}. If your browser downloads it, open the .ics file in your default calendar app and confirm the import.${skipped ? ` ${skipped} without times excluded.` : ""}${overlaps ? ` ${overlaps} overlapping sessions included.` : ""}`);
+}
+
+function calendarActions(instance, source = "session") {
+  const actions = node("div", "calendar-actions");
+  if (!isScheduled(instance)) {
+    actions.append(node("span", "calendar-unavailable", "Calendar unavailable: time not listed"));
+    return actions;
+  }
+  const download = button("Calendar (.ics)", "save-button calendar-download", () => downloadCalendar(
+    [instance], `${instance.code} - ${instance.title}`, undefined, source,
+  ), "calendar");
+  download.setAttribute("aria-label", `Download calendar event for ${instance.code}, ${shortTime(instance)}`);
+  download.title = "Open with your default calendar app, or download the .ics file";
+  actions.append(download);
+  return actions;
+}
+
+function sessionCalendarActions(session, source = "catalog") {
+  if (session.instances.length === 1) return calendarActions(session.instances[0], source);
+  const actions = node("div", "calendar-actions");
+  if (!session.instances.some(isScheduled)) return calendarActions(session.instances[0], source);
+  const choose = button("Choose calendar time", "save-button", () => openSession(session), "calendar");
+  choose.setAttribute("aria-label", `Choose a calendar time for ${session.code}`);
+  actions.append(choose);
+  return actions;
+}
+
+function renderGuideCalendar(buttonId, helpId, instances) {
+  const scheduled = calendarSessions(instances);
+  const skipped = instances.filter((instance) => !isScheduled(instance)).length;
+  const count = scheduled.length;
+  $(buttonId).disabled = count === 0;
+  $(buttonId).replaceChildren(icon("calendar"), document.createTextNode(
+    count ? `Add all ${count} session${count === 1 ? "" : "s"} to calendar (.ics)` : "Add entire guide to calendar (.ics)",
+  ));
+  $(helpId).textContent = count ?
+    `One .ics file with all ${count} scheduled session${count === 1 ? "" : "s"}; no agenda setup needed. Your browser may open it in your default calendar app or download it for you to open/import.${skipped ? ` ${skipped} without times excluded.` : ""}${getConflicts(scheduled).size ? " Overlapping sessions are included." : ""}` :
+    "Add a session with a listed start and end time to enable calendar import.";
+}
+
 function persistAgenda() {
-  storageWrite(STORAGE.agenda, JSON.stringify({ version: 1, ids: [...saved] }));
+  storageWrite(storageKeys.agenda, JSON.stringify({ version: 1, ids: [...saved] }));
 }
 
 function refreshSavedViews() {
@@ -202,11 +291,10 @@ function saveButton(instance, label = "Save") {
 }
 
 function renderPathOptions() {
-  $("path-options").replaceChildren(...catalog.paths.map((path, index) => {
-    const recommended = path.audience === audience;
+  $("path-options").replaceChildren(...getAudiencePaths(catalog.paths, audience).map((path, index) => {
     const content = node("span");
     content.append(node("strong", "", path.name),
-      node("small", "", recommended ? "Recommended for your company stage" : path.fit));
+      node("small", "", path.fit));
     const element = button("", "path-option", () => {
       activePath = path.id;
       updateURL();
@@ -215,6 +303,7 @@ function renderPathOptions() {
       $("path-options").querySelector(`[data-path="${path.id}"]`)?.focus({ preventScroll: true });
     });
     element.dataset.path = path.id;
+    element.dataset.pathAudience = path.audience;
     element.setAttribute("aria-pressed", String(path.id === activePath));
     element.append(node("span", "path-number", String(index + 1).padStart(2, "0")), content, icon("arrow-up"));
     return element;
@@ -226,6 +315,8 @@ function renderPath() {
   for (const key of ["label", "headline", "description", "fit", "outcome"]) {
     $(`path-${key}`).textContent = path[key];
   }
+  renderGuideCalendar("export-path", "path-calendar-help", pathInstances(path));
+  $("path-calendar-help").append(document.createTextNode(" Uses each session's earliest listed occurrence."));
   $("path-steps").replaceChildren(...path.steps.map((step, index) => {
     const session = catalog.byCode.get(step.code);
     const item = node("li", "path-step");
@@ -239,7 +330,7 @@ function renderPath() {
     const isSaved = session.instances.some((instance) => saved.has(instance.id));
     bottom.append(sessionTime(session.instances[0]),
       button(isSaved ? "Saved to agenda" : "Session brief", "text-link", () => openSession(session), isSaved ? "check" : "arrow"));
-    card.append(kicker, title, node("p", "step-why", step.why), bottom);
+    card.append(kicker, title, node("p", "step-why", step.why), bottom, sessionCalendarActions(session, "path"));
     item.append(node("span", "step-number", String(index + 1).padStart(2, "0")), card);
     return item;
   }));
@@ -255,9 +346,14 @@ function setupFilters() {
   for (const [key, values] of Object.entries(options)) {
     for (const value of values) $(key).append(new Option(value, value));
   }
-  for (const path of catalog.paths) $("path-filter").append(new Option(path.name, path.id));
   setupDays();
-  syncFilterInputs();
+}
+
+function populatePathFilter() {
+  $("path-filter").replaceChildren(new Option("All sessions", ""));
+  for (const path of getAudiencePaths(catalog.paths, audience)) {
+    $("path-filter").append(new Option(path.name, path.id));
+  }
 }
 
 function setupDays() {
@@ -286,7 +382,7 @@ function syncFilterInputs() {
 
 function renderCatalog() {
   const focusKey = document.activeElement?.dataset.focusKey;
-  const results = filterCatalog(catalog, filters, timeZone());
+  const results = filterCatalog(catalog, filters, timeZone(), audience);
   const count = node("strong", "", results.length.toLocaleString());
   $("results-count").replaceChildren(count, document.createTextNode(
     ` of ${catalog.sessions.length.toLocaleString()} sessions${filters.path ? " in learning order (when using guide sort)" : " · repeat times grouped"}`));
@@ -298,20 +394,29 @@ function renderCatalog() {
     [...$("session-grid").querySelectorAll("[data-focus-key]")]
       .find((element) => element.dataset.focusKey === focusKey)?.focus({ preventScroll: true });
   }
+  return results.length;
+}
+
+function recordEmptyResults(count) {
+  if (count !== 0) return;
+  const facetNames = Object.keys(FILTER_DEFAULTS)
+    .filter((key) => key !== "sort" && filters[key] !== FILTER_DEFAULTS[key])
+    .map((key) => key === "q" ? "search" : key);
+  telemetry?.track("catalog_zero_results", { eventId: catalog.event.id, facetNames });
 }
 
 function sessionCard(session) {
   const first = session.instances[0];
+  const recommendations = audienceRecommendations(session, audience);
   const article = node("article", "session-card");
   const top = node("div", "card-top");
   top.append(node("span", "badge", first.type));
-  if (session.recommendations.length) top.append(node("span", "badge badge-accent", "Guide pick"));
+  if (recommendations.length) top.append(node("span", "badge badge-accent", "Guide pick"));
   top.append(node("span", "session-code", session.code));
   const title = node("h3", "card-title");
   title.append(button(session.title, "", () => openSession(session)));
   article.append(top, title, node("p", "card-description", session.description));
-  const recommendation = session.recommendations.find((item) => item.path.id === filters.path) ||
-    session.recommendations[0];
+  const recommendation = recommendations.find((item) => item.path.id === filters.path) || recommendations[0];
   if (recommendation) {
     const payoff = node("div", "card-payoff");
     payoff.append(node("span", "", "TAKE THIS HOME"), node("p", "", recommendation.step.takeaway));
@@ -343,11 +448,16 @@ function sessionCard(session) {
   add.title = inGuide ? "Already in your custom guide" : "Add to custom guide";
   actions.append(save, add);
   footer.append(button("Session brief", "text-link", () => openSession(session), "arrow"), actions);
-  article.append(meta, tags, footer);
+  article.append(meta, tags, footer, sessionCalendarActions(session));
   return article;
 }
 
 function openSession(session, snapshot = false) {
+  if (!snapshot) {
+    telemetry?.track("session_opened", {
+      eventId: catalog.event.id, sessionId: session.sessionId, source: "catalog",
+    });
+  }
   dialogContext = {
     session: snapshot ? { ...session, instances: [session], recommendations: [] } : catalog.byId.get(session.sessionId),
     snapshot,
@@ -361,6 +471,7 @@ function openSession(session, snapshot = false) {
 
 function renderDialog() {
   const { session, snapshot, matchingIds } = dialogContext;
+  const recommendations = audienceRecommendations(session, audience);
   const focusKey = document.activeElement?.dataset.focusKey;
   const content = $("dialog-content");
   const badges = node("div", "dialog-badges");
@@ -374,16 +485,16 @@ function renderDialog() {
   const tags = node("div", "card-tags");
   tags.append(...session.topics.map((topic) => node("span", "topic-tag", topic)));
   content.append(tags);
-  if (session.recommendations.length) {
+  if (recommendations.length) {
     content.append(node("h3", "dialog-section-title", "Why go, and where does it fit?"));
-    for (const { path, step, index } of session.recommendations) {
+    for (const { path, step, index } of recommendations) {
       const box = node("div", "recommendation");
       box.append(node("p", "eyebrow", `${path.name} / Step ${index + 1}: ${step.stage}`),
         node("p", "", step.why), node("p", "takeaway", `Take this home: ${step.takeaway}`));
       content.append(box);
     }
   } else if (!snapshot) {
-    content.append(node("p", "dialog-note", "An open-catalog discovery, outside the three curated paths. Use the description and level to decide whether it answers a question your team needs to resolve."));
+    content.append(node("p", "dialog-note", "An open-catalog discovery, outside your current audience's curated guides. Use the description and level to decide whether it answers a question your team needs to resolve."));
   }
   content.append(node("h3", "dialog-section-title", snapshot ? "Time saved with this guide" : "Choose your session time"));
   if (!snapshot && matchingIds.size < session.instances.length) {
@@ -399,8 +510,10 @@ function renderDialog() {
     if (instance.viewing.length) info.append(node("p", "", instance.viewing.join(" · ")));
     row.append(info);
     if (!snapshot) row.append(saveButton(instance));
+    row.append(calendarActions(instance));
     content.append(row);
   }
+  content.append(node("p", "dialog-note", "Calendar (.ics) provides an event for your default calendar app. Depending on your browser settings, it may open automatically or download locally; open the file to import it in Outlook, Apple Calendar, or another calendar app. These are personal calendar entries, not seat reservations."));
   if (!snapshot) {
     const first = session.instances.find((instance) => matchingIds.has(instance.id)) || session.instances[0];
     const inGuide = draft.steps.some((step) => step.session.sessionId === session.sessionId);
@@ -412,8 +525,8 @@ function renderDialog() {
     const current = catalog.byId.get(session.sessionId);
     if (current) content.append(button("View current catalog listing", "button dialog-official", () => openSession(current), "arrow"));
   }
-  const official = node("a", "text-link dialog-official", "Open official Ignite catalog");
-  official.href = "https://ignite.microsoft.com/en-US/sessions";
+  const official = node("a", "text-link dialog-official", `Open official ${catalog.event.name} catalog`);
+  official.href = catalog.event.catalogUrl;
   official.target = "_blank";
   official.rel = "noopener noreferrer";
   official.append(icon("arrow-up"));
@@ -455,6 +568,7 @@ function renderAgenda() {
     const body = node("div", "agenda-item-body");
     body.append(button(instance.title, "agenda-item-title", () => openSession(catalog.byId.get(instance.sessionId))),
       node("p", "agenda-item-detail", `${instance.code} · ${instance.location || "Location not listed"} · ${instance.delivery.join(" + ")}`));
+    body.append(calendarActions(instance, "agenda"));
     if (conflicts.has(instance.id)) body.append(node("p", "conflict-label",
       `Overlaps ${conflicts.get(instance.id).map((id) => catalog.instanceById.get(id).code).join(", ")}`));
     const remove = button("", "icon-button", () => toggleSaved(instance), "close");
@@ -472,7 +586,7 @@ function renderAgenda() {
 
 function persistDraft() {
   draftRevision++;
-  storageWrite(STORAGE.draft, JSON.stringify(draft));
+  storageWrite(storageKeys.draft, JSON.stringify(draft));
   $("share-result").hidden = true;
 }
 
@@ -500,8 +614,9 @@ function renderDraft() {
   $("guide-summary").value = draft.summary;
   $("draft-count").textContent = `${draft.steps.length} / ${GUIDE_LIMITS.steps} SESSIONS`;
   $("draft-empty").hidden = draft.steps.length > 0;
-  $("clear-draft").disabled = draft.steps.length === 0 && draft.title === "My Ignite guide" && !draft.summary;
+  $("clear-draft").disabled = draft.steps.length === 0 && draft.title === newDraft().title && !draft.summary;
   $("share-guide").disabled = draft.steps.length === 0;
+  renderGuideCalendar("export-draft-guide", "draft-calendar-help", draft.steps.map((step) => step.session));
   $("draft-steps").replaceChildren(...draft.steps.map((step, index) => customStep(step, index, true)));
 }
 
@@ -510,7 +625,8 @@ function customStep(step, index, editable) {
   const body = node("div");
   const session = step.session;
   body.append(button(session.title, "custom-step-title", () => openSession(session, true)),
-    node("p", "custom-step-meta", `${session.code} · ${shortTime(session)} · ${session.type}`));
+    node("p", "custom-step-meta", `${session.code} · ${shortTime(session)} · ${session.type}`),
+    calendarActions(session, editable ? "draft" : "shared"));
   if (editable) {
     const label = node("label", "", "Why should someone attend this session?");
     const input = node("textarea");
@@ -590,7 +706,7 @@ function confirmAction(title, description, label, action) {
 
 function replaceDraft(next, message) {
   const replace = () => {
-    draft = next;
+    draft = validateGuide({ ...next, version: 2, eventId: catalog.event.id });
     persistDraft();
     renderDraft();
     renderCatalog();
@@ -605,7 +721,7 @@ function replaceDraft(next, message) {
 function customizePath() {
   const path = catalog.paths.find((item) => item.id === activePath);
   replaceDraft({
-    version: 1, title: path.name, summary: path.description,
+    version: 2, eventId: catalog.event.id, title: path.name, summary: path.description,
     steps: path.steps.map((step) => ({
       session: snapshotSession(catalog.byCode.get(step.code).instances[0]),
       note: `${step.why}\n\nTake this home: ${step.takeaway}`,
@@ -619,18 +735,27 @@ function renderShared() {
   $("guide-editor").hidden = true;
   $("shared-guide-title").textContent = sharedGuide.title;
   $("shared-guide-summary").textContent = sharedGuide.summary;
+  renderGuideCalendar("export-shared-guide", "shared-calendar-help", sharedGuide.steps.map((step) => step.session));
   $("shared-guide-steps").replaceChildren(...sharedGuide.steps.map((step, index) => customStep(step, index, false)));
 }
 
 function applyURLState() {
-  ({ filters, audience, activePath, zoneChoice } = readViewState(location.search, catalog.paths));
+  ({ filters, audience, activePath, zoneChoice } = readViewState(location.search, catalog.paths, {
+    eventTimeZone: catalog.event.timeZone, audiences: catalog.audiences,
+  }));
   $("timezone").value = zoneChoice;
   const theme = new URLSearchParams(location.search).get("scoutTheme");
   document.documentElement.dataset.theme = theme ||
     (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  preserveThemeForSiteLinks(document.body, location);
 }
 
 function renderView() {
+  const label = `${catalog.audiences.find((item) => item.id === audience).label} guides`;
+  $("audience-heading").textContent = `Your ${label.toLowerCase()}.`;
+  $("path-options").setAttribute("aria-label", label);
+  populatePathFilter();
+  syncFilterInputs();
   renderPathOptions();
   renderPath();
   renderCatalog();
@@ -639,6 +764,17 @@ function renderView() {
   document.querySelectorAll("[data-audience]").forEach((element) => {
     element.setAttribute("aria-pressed", String(element.dataset.audience === audience));
   });
+}
+
+function selectAudience(next) {
+  audience = next;
+  const first = getAudiencePaths(catalog.paths, audience)[0];
+  if (!first) throw new Error(`No guides are configured for ${audience}.`);
+  activePath = first.id;
+  filters.q = $("search").value;
+  visibleCount = PAGE_SIZE;
+  renderView();
+  updateURL();
 }
 
 async function syncSharedView({ scroll = false } = {}) {
@@ -653,9 +789,23 @@ async function syncSharedView({ scroll = false } = {}) {
   try {
     const decoded = await decodeGuide(token);
     if (!isCurrent()) return;
+    const eventId = getGuideEventId(decoded);
+    if (eventId !== catalog.event.id) {
+      const targetEvent = events.find((item) => item.id === eventId);
+      if (!targetEvent) throw new Error("The event for this shared guide is not available.");
+      const destination = new URL(targetEvent.url, location.href);
+      if (destination.origin !== location.origin) throw new Error("The event destination is not on this site.");
+      destination.search = location.search;
+      destination.hash = location.hash || "my-guide";
+      location.replace(destination.href);
+      return;
+    }
     sharedGuide = decoded;
     viewingShared = true;
     renderShared();
+    telemetry?.track("shared_guide_opened", {
+      eventId: catalog.event.id, shareVersion: decoded.version, sessionCount: decoded.steps.length,
+    });
     if (scroll && ["", "#my-guide"].includes(location.hash)) {
       $("my-guide").scrollIntoView({ behavior: "instant" });
     }
@@ -682,6 +832,9 @@ async function shareGuide() {
     $("share-url").value = url;
     $("open-guide-link").href = url;
     $("share-result").hidden = false;
+    telemetry?.trackComposition("custom_guide_created", draft.steps.map((step) => step.session), {
+      eventId: catalog.event.id, source: "custom", sessionCount: draft.steps.length, shareVersion: draft.version,
+    });
     guideMessage("");
     $("share-url").focus();
     $("share-url").select();
@@ -703,14 +856,7 @@ function bindEvents() {
         showDraft();
         return;
       }
-      audience = element.dataset.entry;
-      activePath = audience === "startup" ? "launch" : "scale";
-      document.querySelectorAll("[data-audience]").forEach((item) => {
-        item.setAttribute("aria-pressed", String(item.dataset.audience === audience));
-      });
-      renderPathOptions();
-      renderPath();
-      updateURL();
+      selectAudience(element.dataset.entry);
       location.hash = "guide";
       $("guide").scrollIntoView();
       $("path-headline").tabIndex = -1;
@@ -725,7 +871,7 @@ function bindEvents() {
       filters.q = $("search").value;
       visibleCount = PAGE_SIZE;
       updateURL();
-      renderCatalog();
+      recordEmptyResults(renderCatalog());
     }, 140);
   });
   for (const key of ["topic", "type", "level", "delivery", "day", "path", "sort"]) {
@@ -733,7 +879,7 @@ function bindEvents() {
       filters[key] = event.target.value;
       visibleCount = PAGE_SIZE;
       updateURL();
-      renderCatalog();
+      recordEmptyResults(renderCatalog());
     });
   }
   const reset = () => {
@@ -764,19 +910,22 @@ function bindEvents() {
   });
   document.querySelectorAll("[data-audience]").forEach((element) => {
     element.addEventListener("click", () => {
-      audience = element.dataset.audience;
-      activePath = audience === "startup" ? "launch" : "scale";
-      document.querySelectorAll("[data-audience]").forEach((item) => {
-        item.setAttribute("aria-pressed", String(item.dataset.audience === audience));
-      });
-      updateURL();
-      renderPathOptions();
-      renderPath();
+      selectAudience(element.dataset.audience);
     });
   });
   $("save-path").addEventListener("click", () => {
     const path = catalog.paths.find((item) => item.id === activePath);
-    addSessionsToAgenda(path.steps.map((step) => catalog.byCode.get(step.code).instances[0]));
+    addSessionsToAgenda(pathInstances(path));
+  });
+  $("export-path").addEventListener("click", () => {
+    const path = catalog.paths.find((item) => item.id === activePath);
+    downloadCalendar(pathInstances(path), path.name, undefined, "path");
+  });
+  $("export-draft-guide").addEventListener("click", () => {
+    downloadCalendar(draft.steps.map((step) => step.session), draft.title.trim() || newDraft().title, undefined, "draft");
+  });
+  $("export-shared-guide").addEventListener("click", () => {
+    downloadCalendar(sharedGuide.steps.map((step) => step.session), sharedGuide.title, undefined, "shared");
   });
   $("customize-path").addEventListener("click", customizePath);
   $("start-from-path").addEventListener("click", customizePath);
@@ -825,22 +974,7 @@ function bindEvents() {
   });
   $("confirm-dialog").addEventListener("close", () => { confirmCallback = null; });
   $("export-calendar").addEventListener("click", () => {
-    const instances = selectedInstances();
-    const scheduled = instances.filter(isScheduled);
-    if (!scheduled.length) {
-      announce("Save a session with a listed start and end time before exporting.");
-      return;
-    }
-    const blob = new Blob([calendarExport(instances)], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = node("a");
-    link.href = url;
-    link.download = "my-ignite-2026-agenda.ics";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    announce(`Exported ${scheduled.length} sessions.${scheduled.length < instances.length ? " Sessions without times were excluded." : ""}`);
+    downloadCalendar(selectedInstances(), `${catalog.event.name} - My agenda`, `my-${catalog.event.id}-agenda.ics`, "agenda");
   });
   for (const [id, key] of [["guide-title", "title"], ["guide-summary", "summary"]]) {
     $(id).addEventListener("input", () => {
@@ -876,30 +1010,35 @@ function bindEvents() {
   window.addEventListener("popstate", () => {
     applyURLState();
     setupDays();
-    syncFilterInputs();
     visibleCount = PAGE_SIZE;
     renderView();
     syncSharedView();
+  });
+  wireEventLinks(document.body, () => telemetry);
+  window.addEventListener("beforeunload", (event) => {
+    if (!unsavedStorageKeys.size) return;
+    event.preventDefault();
+    event.returnValue = "";
   });
 }
 
 function restoreLocalData() {
   try {
-    const restored = restoreSaved(storageRead(STORAGE.agenda), catalog.instanceById);
+    const restored = restoreSaved(storageRead(storageKeys.agenda), catalog.instanceById);
     saved = new Set(restored.ids);
     if (restored.removed) storageWarning(`${restored.removed} previously saved session times are no longer in this catalog and were removed from the agenda.`);
   } catch (error) {
     storageWarning(`Your previous agenda could not be read: ${error.message} New selections will replace it.`);
   }
-  const rawDraft = storageRead(STORAGE.draft);
+  const rawDraft = storageRead(storageKeys.draft);
   if (rawDraft !== null) {
     try {
-      const parsed = JSON.parse(rawDraft);
-      if (typeof parsed.title === "string" && parsed.title.length > GUIDE_LIMITS.title) {
-        throw new Error(`Guide title must be at most ${GUIDE_LIMITS.title} characters.`);
-      }
+      const parsed = validateStoredDraft(rawDraft, catalog.event.id);
       // An unfinished title is a valid local draft, but not a shareable guide yet.
-      draft = validateGuide({ ...parsed, title: parsed.title?.trim() ? parsed.title : "My Ignite guide" });
+      draft = validateGuide({
+        ...parsed, version: 2, eventId: catalog.event.id,
+        title: parsed.title?.trim() ? parsed.title : newDraft().title,
+      });
       if (typeof parsed.title === "string") draft.title = parsed.title;
     } catch (error) {
       storageWarning(`Your previous guide draft could not be read: ${error.message} New edits will replace it; existing share links remain unchanged.`);
@@ -914,6 +1053,30 @@ async function boot() {
     const response = await fetch(document.body.dataset.catalog);
     if (!response.ok) throw new Error(`Catalog request returned HTTP ${response.status}.`);
     catalog = createCatalog(await response.json());
+    const manifestResponse = await fetch(document.body.dataset.events);
+    if (!manifestResponse.ok) throw new Error(`Event directory request returned HTTP ${manifestResponse.status}.`);
+    const manifest = validateManifest(await manifestResponse.json());
+    events = manifest.events;
+    storageKeys = eventStorageKeys(catalog.event.id);
+    draft = newDraft();
+    if (!telemetry) telemetry = initializeTelemetry({ events, catalog });
+    else telemetry.setCatalog(catalog);
+    const eventZone = [...$("timezone").options].find((option) => !["local", "UTC"].includes(option.value));
+    if (eventZone) {
+      eventZone.value = catalog.event.timeZone;
+      eventZone.textContent = `Event time · ${catalog.event.timeZone}`;
+    }
+    let browserStorage;
+    try {
+      browserStorage = window.localStorage;
+    } catch (error) {
+      storageWarning(`Browser storage is unavailable (${error.name}). Keep a share link before leaving this event.`);
+    }
+    if (browserStorage) {
+      await migrateLegacyStorage(catalog.event.id, browserStorage, {
+        locks: navigator.locks, onWarning: storageWarning,
+      });
+    }
     applyURLState();
     restoreLocalData();
     setupFilters();
@@ -946,6 +1109,7 @@ $("theme-toggle").addEventListener("click", () => {
   const url = new URL(location.href);
   url.searchParams.set("scoutTheme", next);
   history.replaceState(null, "", url);
+  preserveThemeForSiteLinks(document.body, location);
   $("theme-toggle").setAttribute("aria-label", `Switch to ${next === "dark" ? "light" : "dark"} theme`);
 });
 $("retry-load").addEventListener("click", boot);

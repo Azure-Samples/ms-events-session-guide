@@ -1,0 +1,22 @@
+{{- /* Shared footer with privacy controls. Context: dict "telemetry" "backToTop" (bool). */ -}}
+<footer class="site-footer container">
+  <a class="brand footer-brand" href="{{ site.Home.RelPermalink }}">events <span class="brand-divider">/</span> guide</a>
+  <p>For the teams building what comes next. An independent guide; not official event guidance.</p>
+  <div class="footer-actions">
+    {{- $notices := resources.FromString "third-party-notices.txt" (os.ReadFile "NOTICE") }}
+    <a class="text-link" href="{{ $notices.RelPermalink }}">Third-party notices</a>
+    {{- $privacy := resources.FromString "privacy.txt" (os.ReadFile "PRIVACY") }}
+    <a class="text-link" href="{{ $privacy.RelPermalink }}">Data collection</a>
+    <a class="text-link" href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener noreferrer">Privacy statement</a>
+    {{- if .telemetry.enabled }}
+    <button type="button" class="text-link" id="privacy-settings">Privacy settings</button>
+    <span id="telemetry-status" class="telemetry-status" role="status" aria-live="polite"></span>
+    {{- end }}
+    {{- if .backToTop }}
+    <a class="text-link" href="#top">Back to top &uarr;</a>
+    {{- end }}
+  </div>
+</footer>
+{{- if .telemetry.enabled }}
+<div id="cookie-banner" class="cookie-banner"></div>
+{{- end }}

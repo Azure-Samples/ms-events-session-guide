@@ -1,0 +1,14 @@
+{{- /* Formats an event's local calendar dates. Context: event metadata dict. */ -}}
+{{- $start := time.AsTime (printf "%sT00:00:00Z" .startDate) -}}
+{{- $end := time.AsTime (printf "%sT00:00:00Z" .endDate) -}}
+{{- $text := "" -}}
+{{- if eq .startDate .endDate -}}
+  {{- $text = $start.Format "Jan 2, 2006" -}}
+{{- else if and (eq $start.Year $end.Year) (eq $start.Month $end.Month) -}}
+  {{- $text = printf "%s–%s" ($start.Format "Jan 2") ($end.Format "2, 2006") -}}
+{{- else if eq $start.Year $end.Year -}}
+  {{- $text = printf "%s – %s" ($start.Format "Jan 2") ($end.Format "Jan 2, 2006") -}}
+{{- else -}}
+  {{- $text = printf "%s – %s" ($start.Format "Jan 2, 2006") ($end.Format "Jan 2, 2006") -}}
+{{- end -}}
+{{- return $text -}}

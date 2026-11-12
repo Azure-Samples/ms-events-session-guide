@@ -1,0 +1,58 @@
+{{- /*
+  Reads a catalog already in the documented normalized schema
+  ("normalized" catalogFormat): {"updated": "<ISO timestamp>"?, "instances": [...]}.
+  Context: dict "source" "where". Returns dict "instances" "updated".
+*/ -}}
+{{- $where := .where -}}
+{{- $source := .source -}}
+{{- if or (not (reflect.IsMap $source)) (not (reflect.IsSlice (index $source "instances"))) -}}
+  {{- errorf "%s: a normalized catalog must be an object with an instances array" $where -}}
+{{- end -}}
+{{- $updated := index $source "updated" | default "" -}}
+{{- if ne (printf "%T" $updated) "string" -}}{{- errorf "%s: catalog updated must be text" $where -}}{{- end -}}
+{{- $instances := slice -}}
+{{- range $index, $item := index $source "instances" -}}
+  {{- $label := printf "%s: instances[%d]" $where $index -}}
+  {{- if not (reflect.IsMap $item) -}}{{- errorf "%s must be an object" $label -}}{{- continue -}}{{- end -}}
+  {{- range $field := slice "id" "sessionId" "code" "title" -}}
+    {{- $value := index $item $field -}}
+    {{- if or (ne (printf "%T" $value) "string") (not (strings.TrimSpace $value)) -}}
+      {{- errorf "%s.%s must be nonempty text" $label $field -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $field := slice "description" "speakers" "type" "level" "start" "end" "location" -}}
+    {{- if ne (printf "%T" (index $item $field)) "string" -}}{{- errorf "%s.%s must be text (use \"\" when unknown)" $label $field -}}{{- end -}}
+  {{- end -}}
+  {{- range $field := slice "topics" "delivery" "audiences" "viewing" -}}
+    {{- $value := index $item $field -}}
+    {{- if and (eq $field "audiences") (eq $value nil) -}}{{- continue -}}{{- end -}}
+    {{- if not (reflect.IsSlice $value) -}}{{- errorf "%s.%s must be a list of text values" $label $field -}}{{- continue -}}{{- end -}}
+    {{- range $value -}}
+      {{- if ne (printf "%T" .) "string" -}}{{- errorf "%s.%s must contain only text values" $label $field -}}{{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $duration := index $item "duration" -}}
+  {{- if or (ne (printf "%T" $duration) "float64") (lt $duration 0) (gt $duration 1440) (ne (math.Floor $duration) $duration) -}}
+    {{- errorf "%s.duration must be a whole number of minutes between 0 and 1440" $label -}}
+  {{- end -}}
+  {{- $start := index $item "start" -}}
+  {{- $end := index $item "end" -}}
+  {{- if ne (eq $start "") (eq $end "") -}}
+    {{- errorf "%s: start and end must both be empty or both be set" $label -}}
+  {{- else if $start -}}
+    {{- $pattern := `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$` -}}
+    {{- if or (not (findRE $pattern $start 1)) (not (findRE $pattern $end 1)) -}}
+      {{- errorf "%s: start and end must be ISO date-times with a time zone offset" $label -}}
+    {{- else if not (lt (time.AsTime $start).Unix (time.AsTime $end).Unix) -}}
+      {{- errorf "%s: end must be after start" $label -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $instances = $instances | append (dict
+    "id" $item.id "sessionId" $item.sessionId "code" $item.code "title" $item.title
+    "description" $item.description "speakers" $item.speakers "type" $item.type
+    "level" $item.level "topics" $item.topics "delivery" $item.delivery
+    "audiences" ($item.audiences | default slice) "viewing" $item.viewing
+    "start" $start "end" $end "duration" $duration "location" $item.location
+  ) -}}
+{{- end -}}
+{{- return dict "instances" $instances "updated" $updated -}}

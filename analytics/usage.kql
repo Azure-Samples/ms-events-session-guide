@@ -1,0 +1,78 @@
+// Copyright (c) Microsoft Corporation. Licensed under the MIT license.
+// Run in the dedicated Log Analytics workspace. Change the range/environment.
+// Keep the let statements when selecting one of the result queries below.
+let Since = ago(365d);
+let Environment = "production";
+let Parts = materialize(
+    AppEvents
+    | where TimeGenerated >= Since
+    | where tostring(Properties.schemaVersion) == "1"
+    | where tostring(Properties.environment) == Environment
+    | extend EventId=tostring(Properties.eventId),
+             CatalogVersion=tostring(Properties.catalogVersion),
+             ActionId=tostring(Properties.actionId),
+             Source=tostring(Properties.source),
+             PartIndex=toint(Properties.partIndex)
+    | where isnotempty(EventId) and isnotempty(ActionId)
+    | summarize arg_min(TimeGenerated, *) by Name, EventId, ActionId, PartIndex
+);
+let Compositions = materialize(
+    Parts
+    | where Name in ("calendar_export_requested", "custom_guide_created")
+    | extend ExpectedParts=toint(Properties.partCount),
+             ItemsInPart=toint(Properties.itemsInPart),
+             KnownItems=toint(Properties.knownItemCount),
+             UnknownItems=toint(Properties.unknownItemCount),
+             TotalItems=toint(Properties.totalItemCount)
+);
+let Actions = materialize(
+    Compositions
+    | summarize FirstSeen=min(TimeGenerated), ReceivedParts=count(),
+                MinPart=min(PartIndex), MaxPart=max(PartIndex),
+                MinExpectedParts=min(ExpectedParts), ExpectedParts=max(ExpectedParts),
+                ReceivedItems=sum(ItemsInPart), KnownItems=max(KnownItems),
+                UnknownItems=max(UnknownItems), TotalItems=max(TotalItems),
+                Source=take_any(Source), CatalogVersion=take_any(CatalogVersion)
+      by Name, EventId, ActionId
+    | extend DeliveryComplete=ReceivedParts == ExpectedParts
+                and MinExpectedParts == ExpectedParts and MinPart == 0
+                and MaxPart == ExpectedParts - 1 and ReceivedItems == KnownItems
+    | extend CompositionComplete=DeliveryComplete and UnknownItems == 0
+);
+let Members = materialize(
+    Compositions
+    | join kind=inner (
+        Actions | project Name, EventId, ActionId, DeliveryComplete, UnknownItems
+      ) on Name, EventId, ActionId
+    | where DeliveryComplete
+    | mv-expand Member=parse_json(tostring(Properties.composition))
+    | extend SessionId=tostring(Member.sessionId),
+             OccurrenceId=tostring(Member.occurrenceId), Position=toint(Member.position)
+    | where isnotempty(SessionId) and isnotempty(OccurrenceId)
+);
+// 1. Monthly source-observed event selections and other explicit non-composition actions.
+Parts
+| where Name in ("event_selected", "session_opened", "shared_guide_opened", "catalog_zero_results")
+| summarize ObservedActions=count() by Month=startofmonth(TimeGenerated), EventId, Name
+| order by Month desc, ObservedActions desc;
+// 2. Whole actions, not multipart row counts. Partial/unknown membership stays visible.
+Actions
+| summarize ObservedActions=count(), CompleteCompositions=countif(CompositionComplete),
+            PartialDeliveries=countif(not(DeliveryComplete)),
+            ActionsWithUnknownReferences=countif(UnknownItems > 0)
+  by Month=startofmonth(FirstSeen), EventId, Name, Source
+| order by Month desc, ObservedActions desc;
+// 3. Session interest. Repeated occurrences of one session count once per action.
+Members
+| summarize CalendarRequests=dcountif(ActionId, Name == "calendar_export_requested"),
+            CustomGuideCreations=dcountif(ActionId, Name == "custom_guide_created")
+  by EventId, CatalogVersion, SessionId
+| order by CalendarRequests desc, CustomGuideCreations desc;
+// 4. Ordered custom-guide compositions. These are creations of share links, not unique people.
+Members
+| where Name == "custom_guide_created"
+| sort by ActionId asc, Position asc
+| summarize FirstSeen=min(TimeGenerated), OrderedSessionIds=make_list(SessionId),
+            OrderedOccurrenceIds=make_list(OccurrenceId), UnknownReferences=max(UnknownItems)
+  by EventId, CatalogVersion, ActionId
+| order by FirstSeen desc

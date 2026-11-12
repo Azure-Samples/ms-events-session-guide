@@ -1,0 +1,28 @@
+{{- /* Active event identity and event switcher. Context: dict "current" (metadata) "manifest". */ -}}
+{{- $current := .current -}}
+<div class="event-bar" id="event-bar">
+  <div class="container event-bar-inner">
+    <div class="event-identity">
+      <span class="eyebrow">Event guide</span>
+      <strong class="event-identity-name">{{ $current.name }}</strong>
+      <span class="event-identity-meta"><time datetime="{{ $current.startDate }}">{{ partial "events/date-range.html" $current }}</time> <span aria-hidden="true">&middot;</span> Event time {{ $current.timeZoneAbbreviation }} ({{ $current.timeZone }})</span>
+    </div>
+    <nav class="event-switcher" aria-label="Events">
+      <details>
+        <summary>Switch event <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg></summary>
+        <ul class="event-switcher-list">
+          {{- range .manifest.events }}
+          <li>
+            {{- if eq .id $current.id }}
+            <span class="event-switcher-current" aria-current="page"><strong>{{ .name }}</strong><small>{{ partial "events/date-range.html" . }} &middot; current</small></span>
+            {{- else }}
+            <a href="{{ .url }}" data-event-id="{{ .id }}" data-event-source="switcher"><strong>{{ .name }}</strong><small>{{ partial "events/date-range.html" . }}</small></a>
+            {{- end }}
+          </li>
+          {{- end }}
+        </ul>
+      </details>
+      <a class="text-link" href="{{ site.Home.RelPermalink }}">All events <span aria-hidden="true">&rarr;</span></a>
+    </nav>
+  </div>
+</div>

@@ -1,0 +1,68 @@
+{{- /* Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license. */ -}}
+{{- $flag := os.Getenv "HUGO_TELEMETRY_ENABLED" -}}
+{{- if not (in (slice "" "true" "false") $flag) -}}
+  {{- errorf "HUGO_TELEMETRY_ENABLED must be true, false, or unset" -}}
+{{- end -}}
+{{- $enabled := eq $flag "true" -}}
+{{- $config := dict "enabled" false -}}
+{{- if $enabled -}}
+  {{- $environment := os.Getenv "HUGO_TELEMETRY_ENV" -}}
+  {{- if not (in (slice "production" "test") $environment) -}}
+    {{- errorf "Enabled telemetry requires HUGO_TELEMETRY_ENV=production or test" -}}
+  {{- end -}}
+  {{- $connection := os.Getenv "HUGO_TELEMETRY_CONNECTION_STRING" -}}
+  {{- $fields := dict -}}
+  {{- range split $connection ";" -}}
+    {{- if . -}}
+      {{- $pair := split . "=" -}}
+      {{- if ne (len $pair) 2 -}}
+        {{- errorf "Invalid telemetry connection string field" -}}
+      {{- else -}}
+        {{- $key := lower (index $pair 0) -}}
+        {{- $value := index $pair 1 -}}
+        {{- if or (isset $fields $key) (not (in (slice "instrumentationkey" "ingestionendpoint" "liveendpoint" "applicationid") $key)) -}}
+          {{- errorf "Invalid or duplicate telemetry connection string field" -}}
+        {{- end -}}
+        {{- $fields = merge $fields (dict $key $value) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $guid := `^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$` -}}
+  {{- if not (findRE $guid (index $fields "instrumentationkey" | default "")) -}}
+    {{- errorf "Enabled telemetry requires a GUID InstrumentationKey" -}}
+  {{- end -}}
+  {{- if not (findRE `^https://[a-z0-9-]+(?:\.[a-z0-9-]+)*\.in\.applicationinsights\.azure\.com/?$` (index $fields "ingestionendpoint" | default "")) -}}
+    {{- errorf "Enabled telemetry requires a resource-provided HTTPS IngestionEndpoint on in.applicationinsights.azure.com" -}}
+  {{- end -}}
+  {{- with index $fields "liveendpoint" -}}
+    {{- if not (findRE `^https://[a-z0-9-]+(?:\.[a-z0-9-]+)*\.livediagnostics\.monitor\.azure\.com/?$` .) -}}
+      {{- errorf "Invalid telemetry LiveEndpoint" -}}
+    {{- end -}}
+  {{- end -}}
+  {{- with index $fields "applicationid" -}}
+    {{- if not (findRE $guid .) -}}{{- errorf "Invalid telemetry ApplicationId" -}}{{- end -}}
+  {{- end -}}
+  {{- $explicitOrigin := os.Getenv "HUGO_TELEMETRY_ORIGIN" -}}
+  {{- $originInput := $explicitOrigin | default site.BaseURL -}}
+  {{- $url := urls.Parse $originInput -}}
+  {{- $origin := printf "%s://%s" (lower $url.Scheme) (lower $url.Host) -}}
+  {{- $local := in (slice "localhost" "127.0.0.1" "::1") $url.Hostname -}}
+  {{- if or (not $url.Host) $url.User $url.RawQuery $url.Fragment (and (ne $url.Scheme "https") (not (and (eq $environment "test") $local (eq $url.Scheme "http")))) (and (eq $environment "production") $local) -}}
+    {{- errorf "Enabled telemetry requires an approved HTTPS origin (HTTP localhost allowed only for test)" -}}
+  {{- end -}}
+  {{- if and $explicitOrigin (not (in (slice "" "/") $url.Path)) -}}
+    {{- errorf "HUGO_TELEMETRY_ORIGIN must be an origin, without a path" -}}
+  {{- end -}}
+  {{- $mode := os.Getenv "HUGO_TELEMETRY_CONSENT_MODE" | default "wcp" -}}
+  {{- if or (not (in (slice "wcp" "test") $mode)) (and (eq $mode "test") (ne $environment "test")) -}}
+    {{- errorf "Test consent is available only with HUGO_TELEMETRY_ENV=test" -}}
+  {{- end -}}
+  {{- $approval := os.Getenv "HUGO_TELEMETRY_PRODUCTION_APPROVED" -}}
+  {{- if not (in (slice "" "true" "false") $approval) -}}
+    {{- errorf "HUGO_TELEMETRY_PRODUCTION_APPROVED must be true, false, or unset" -}}
+  {{- end -}}
+  {{- $buildId := os.Getenv "HUGO_TELEMETRY_BUILD_ID" | default "local" -}}
+  {{- if not (findRE `^[A-Za-z0-9._:-]{1,100}$` $buildId) -}}{{- errorf "Invalid telemetry build ID" -}}{{- end -}}
+  {{- $config = dict "enabled" true "connectionString" $connection "environment" $environment "origin" $origin "buildId" $buildId "consentMode" $mode "productionApproved" (eq $approval "true") -}}
+{{- end -}}
+{{- return (dict "enabled" $enabled "config" $config) -}}

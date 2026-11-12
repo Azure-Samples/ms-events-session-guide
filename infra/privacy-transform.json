@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "type": "string", "defaultValue": "eastus" },
+    "workspaceResourceId": { "type": "string" },
+    "ruleName": { "type": "string", "defaultValue": "ms-events-guide-privacy" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Insights/dataCollectionRules",
+      "apiVersion": "2023-03-11",
+      "name": "[parameters('ruleName')]",
+      "location": "[parameters('location')]",
+      "kind": "WorkspaceTransforms",
+      "tags": { "application": "ms-events-guide" },
+      "properties": {
+        "dataSources": {},
+        "destinations": {
+          "logAnalytics": [
+            { "name": "usage", "workspaceResourceId": "[parameters('workspaceResourceId')]" }
+          ]
+        },
+        "dataFlows": [
+          {
+            "streams": ["Microsoft-Table-AppEvents"],
+            "destinations": ["usage"],
+            "transformKql": "source | project-away ClientBrowser, ClientOS, ClientModel, ClientType, ClientCity, ClientStateOrProvince, ClientCountryOrRegion, UserId, UserAccountId, UserAuthenticatedId, SessionId, OperationId, OperationName | extend ClientIP = '0.0.0.0'"
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "ruleId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Insights/dataCollectionRules', parameters('ruleName'))]"
+    }
+  }
+}

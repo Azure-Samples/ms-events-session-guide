@@ -1,0 +1,104 @@
+{{- /*
+  Validates one event bundle's front matter and returns its trusted metadata.
+  Context: the event bundle page. Callers should use partialCached keyed by the
+  bundle directory so validation runs once per build.
+*/ -}}
+{{- $page := . -}}
+{{- $slug := $page.File.ContentBaseName -}}
+{{- $where := printf "content/events/%s/index.md" $slug -}}
+{{- $slugPattern := `^[a-z0-9]+(-[a-z0-9]+)*$` -}}
+{{- $params := $page.Params -}}
+
+{{- $id := index $params "eventid" -}}
+{{- if or (ne (printf "%T" $id) "string") (not (findRE $slugPattern $id 1)) (gt (len $id) 80) -}}
+  {{- errorf "%s: params.eventId must be a lowercase slug of at most 80 characters" $where -}}
+{{- else if ne $id $slug -}}
+  {{- errorf "%s: params.eventId %q must equal the bundle directory name %q" $where $id $slug -}}
+{{- end -}}
+{{- if not (findRE $slugPattern $slug 1) -}}
+  {{- errorf "%s: the bundle directory name must be a lowercase slug" $where -}}
+{{- end -}}
+{{- if not (strings.HasSuffix $page.RelPermalink (printf "/events/%s/" $slug)) -}}
+  {{- errorf "%s: event URLs are fixed to /events/<eventId>/; remove url or slug overrides" $where -}}
+{{- end -}}
+
+{{- $name := $page.Title -}}
+{{- if not (strings.TrimSpace $name) -}}{{- errorf "%s: title (the event name) is required" $where -}}{{- end -}}
+
+{{- $summary := index $params "summary" -}}
+{{- if or (ne (printf "%T" $summary) "string") (not (strings.TrimSpace $summary)) -}}
+  {{- errorf "%s: params.summary must be nonempty text" $where -}}
+{{- end -}}
+
+{{- $dates := dict -}}
+{{- range $field := slice "startDate" "endDate" -}}
+  {{- $value := index $params (lower $field) -}}
+  {{- $valid := false -}}
+  {{- if and (eq (printf "%T" $value) "string") (findRE `^\d{4}-\d{2}-\d{2}$` $value 1) -}}
+    {{- with try (time.AsTime (printf "%sT00:00:00Z" $value)) -}}
+      {{- if and (not .Err) (eq (.Value.Format "2006-01-02") $value) -}}{{- $valid = true -}}{{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $valid -}}
+    {{- errorf "%s: params.%s must be a quoted calendar date in YYYY-MM-DD form" $where $field -}}
+  {{- end -}}
+  {{- $dates = merge $dates (dict $field $value) -}}
+{{- end -}}
+{{- if gt $dates.startDate $dates.endDate -}}
+  {{- errorf "%s: params.endDate must not be before params.startDate" $where -}}
+{{- end -}}
+
+{{- $timeZone := index $params "timezone" -}}
+{{- $validZone := false -}}
+{{- if and (eq (printf "%T" $timeZone) "string") (findRE `^(UTC|[A-Za-z]+(/[A-Za-z0-9_+-]+)+)$` $timeZone 1) -}}
+  {{- with try (time.AsTime "2000-01-01T00:00:00" $timeZone) -}}
+    {{- if not .Err -}}{{- $validZone = true -}}{{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $validZone -}}
+  {{- errorf "%s: params.timeZone must be an IANA time zone such as America/Los_Angeles" $where -}}
+{{- end -}}
+
+{{- $catalogUrl := index $params "catalogurl" -}}
+{{- $validUrl := false -}}
+{{- if and (eq (printf "%T" $catalogUrl) "string") (not (findRE `\s` $catalogUrl 1)) -}}
+  {{- with try (urls.Parse $catalogUrl) -}}
+    {{- if and (not .Err) (eq .Value.Scheme "https") .Value.Host (not .Value.User) -}}{{- $validUrl = true -}}{{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if not $validUrl -}}
+  {{- errorf "%s: params.catalogUrl must be an absolute HTTPS URL without credentials" $where -}}
+{{- end -}}
+
+{{- $format := index $params "catalogformat" -}}
+{{- if not (in (slice "ignite" "normalized") $format) -}}
+  {{- errorf "%s: params.catalogFormat must be \"ignite\" or \"normalized\"" $where -}}
+{{- end -}}
+
+{{- $keywords := slice -}}
+{{- with index $params "keywords" -}}
+  {{- if not (reflect.IsSlice .) -}}{{- errorf "%s: params.keywords must be a list of text values" $where -}}{{- end -}}
+  {{- range . -}}
+    {{- if or (ne (printf "%T" .) "string") (not (strings.TrimSpace .)) -}}
+      {{- errorf "%s: params.keywords must be a list of nonempty text values" $where -}}
+    {{- else -}}
+      {{- $keywords = $keywords | append . -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $tzAbbreviation := (time.AsTime (printf "%sT12:00:00" $dates.startDate) $timeZone).Format "MST" -}}
+
+{{- return dict
+  "id" $id
+  "name" $name
+  "summary" (strings.TrimSpace $summary)
+  "startDate" $dates.startDate
+  "endDate" $dates.endDate
+  "timeZone" $timeZone
+  "timeZoneAbbreviation" $tzAbbreviation
+  "catalogUrl" $catalogUrl
+  "catalogFormat" $format
+  "keywords" $keywords
+  "url" $page.RelPermalink
+-}}

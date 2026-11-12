@@ -1,0 +1,8 @@
+# Nonproduction two-event fixture preview. Combine with the site config:
+#   hugo server --config hugo.toml,tests/fixtures/hugo.toml
+# These events are test data only and must never be copied into content/.
+title = "Events Guide (fixture preview)"
+contentDir = "tests/fixtures/content"
+
+[params]
+fixturePreview = true

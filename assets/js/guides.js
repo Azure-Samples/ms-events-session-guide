@@ -86,7 +86,8 @@ export function snapshotSession(instance) {
 
 export function validateGuide(input) {
   plainObject(input, "The guide");
-  if (input.version !== 1) throw new Error("Unsupported guide version. Only version 1 is supported.");
+  if (input.version !== 1 && input.version !== 2) throw new Error("Unsupported guide version.");
+  const eventId = input.version === 2 ? validateEventId(input.eventId) : undefined;
   const title = text(input.title, "Guide title", GUIDE_LIMITS.title, { required: true, trim: true });
   const summary = text(input.summary, "Guide summary", GUIDE_LIMITS.summary);
   if (!Array.isArray(input.steps) || input.steps.length > GUIDE_LIMITS.steps) {
@@ -100,7 +101,13 @@ export function validateGuide(input) {
     seen.add(session.sessionId);
     return { session, note: text(step.note, "Session note", GUIDE_LIMITS.note) };
   });
-  return { version: 1, title, summary, steps };
+  return input.version === 1 ? { version: 1, title, summary, steps } :
+    { version: 2, eventId, title, summary, steps };
+}
+
+export function getGuideEventId(guide) {
+  const validated = validateGuide(guide);
+  return validated.version === 1 ? LEGACY_EVENT_ID : validated.eventId;
 }
 
 function base64URL(bytes) {
@@ -168,7 +175,7 @@ export async function encodeGuide(input) {
   }
   const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate"));
   const compressed = await collectBytes(stream, MAX_COMPRESSED_BYTES, TOO_LONG);
-  return `1.${base64URL(compressed)}`;
+  return `${guide.version}.${base64URL(compressed)}`;
 }
 
 export async function decodeGuide(token) {
@@ -178,7 +185,7 @@ export async function decodeGuide(token) {
   }
   const match = /^(\d+)\.([A-Za-z0-9_-]+)$/.exec(token);
   if (!match) throw new Error("This guide link has an invalid token format.");
-  if (match[1] !== "1") throw new Error("This guide link uses an unsupported version.");
+  if (!["1", "2"].includes(match[1])) throw new Error("This guide link uses an unsupported version.");
   if (typeof globalThis.DecompressionStream !== "function") {
     throw new Error("This browser cannot open guide links: native decompression is unavailable. Use a current browser.");
   }
@@ -198,7 +205,9 @@ export async function decodeGuide(token) {
   } catch (cause) {
     throw new Error("This guide link does not contain valid JSON guide data.", { cause });
   }
-  return validateGuide(guide);
+  const validated = validateGuide(guide);
+  if (String(validated.version) !== match[1]) throw new Error("This guide link has a mismatched version.");
+  return validated;
 }
 
 export async function createShareURL(baseURL, guide) {
@@ -218,3 +227,4 @@ export async function createShareURL(baseURL, guide) {
   if (result.href.length > GUIDE_LIMITS.url) throw new Error(TOO_LONG);
   return result.href;
 }
+import { LEGACY_EVENT_ID, validateEventId } from "./event-context.js";

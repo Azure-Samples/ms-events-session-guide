@@ -36,3 +36,21 @@ test("action pinning guard rejects mutable and abbreviated refs", () => {
   assert.equal(assertPinnedActions(`- uses: "actions/checkout@${sha}" # version\n- uses: ./.github/actions/local`, "example.yml"), 2);
   assert.equal(assertPinnedActions(`- uses: docker://alpine@sha256:${"b".repeat(64)}`, "example.yml"), 1);
 });
+
+test("Pages telemetry configuration is restricted to main deployment builds", async () => {
+  const source = await readFile(new URL("../.github/workflows/pages.yml", import.meta.url), "utf8");
+  const preview = source.split("- name: Build telemetry-free preview\n")[1]?.split("\n      - name:")[0];
+  assert.ok(preview);
+  assert.ok(preview.includes("if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'"));
+  assert.ok(preview.includes('HUGO_TELEMETRY_ENABLED: "false"'));
+  assert.ok(!preview.includes("vars.HUGO_TELEMETRY"));
+  const deployment = source.split("- name: Build Hugo with the deployment base URL\n")[1]?.split("\n      # Package")[0];
+  assert.ok(deployment);
+  assert.ok(deployment.includes("if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'"));
+  for (const setting of ["ENABLED", "CONNECTION_STRING", "ORIGIN", "PRODUCTION_APPROVED"]) {
+    assert.ok(deployment.includes(`vars.HUGO_TELEMETRY_${setting}`));
+  }
+  assert.ok(deployment.includes("HUGO_TELEMETRY_ENV: production"));
+  assert.ok(deployment.includes("HUGO_TELEMETRY_CONSENT_MODE: wcp"));
+  assert.ok(deployment.includes("HUGO_TELEMETRY_BUILD_ID: ${{ github.sha }}"));
+});

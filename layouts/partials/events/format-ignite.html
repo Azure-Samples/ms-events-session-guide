@@ -1,0 +1,49 @@
+{{- /*
+  Normalizes the raw Microsoft event-catalog export ("ignite" catalogFormat).
+  Context: dict "source" (parsed catalog.json) "where" (error prefix).
+  Returns dict "instances" (normalized session schema) "updated".
+*/ -}}
+{{- $where := .where -}}
+{{- if not (reflect.IsSlice .source) -}}
+  {{- errorf "%s: an ignite-format catalog must be a JSON array of session records" $where -}}
+{{- end -}}
+{{- $instances := slice -}}
+{{- $updated := "" -}}
+{{- range .source -}}
+  {{- if or (not .sessionId) (not .sessionInstanceId) (not .sessionCode) (not .title) -}}
+    {{- errorf "%s: catalog record is missing a session ID, instance ID, code, or title" $where -}}
+  {{- end -}}
+  {{- $topics := slice -}}
+  {{- range .topic -}}{{- $topics = $topics | append .displayValue -}}{{- end -}}
+  {{- $delivery := slice -}}
+  {{- range .deliveryTypes -}}{{- $delivery = $delivery | append .displayValue -}}{{- end -}}
+  {{- $audiences := slice -}}
+  {{- range .audienceTypes -}}{{- $audiences = $audiences | append .displayValue -}}{{- end -}}
+  {{- $viewing := slice -}}
+  {{- range .viewingOptions -}}{{- $viewing = $viewing | append .displayValue -}}{{- end -}}
+  {{- $level := "" -}}
+  {{- with .sessionLevel -}}{{- $level = (index . 0).displayValue -}}{{- end -}}
+  {{- $location := "" -}}
+  {{- with .location -}}{{- $location = .displayValue -}}{{- end -}}
+  {{- $description := .description | default "" | htmlUnescape | plainify | htmlUnescape -}}
+  {{- $instances = $instances | append (dict
+    "id" .sessionInstanceId
+    "sessionId" .sessionId
+    "code" .sessionCode
+    "title" .title
+    "description" $description
+    "speakers" (.speakerNames | default "")
+    "type" (.sessionType.displayValue | default "Session")
+    "level" $level
+    "topics" $topics
+    "delivery" $delivery
+    "audiences" $audiences
+    "viewing" $viewing
+    "start" (.startDateTime | default "")
+    "end" (.endDateTime | default "")
+    "duration" (.durationInMinutes | default 0)
+    "location" $location
+  ) -}}
+  {{- if gt (.lastUpdate | default "") $updated -}}{{- $updated = .lastUpdate -}}{{- end -}}
+{{- end -}}
+{{- return dict "instances" $instances "updated" $updated -}}
