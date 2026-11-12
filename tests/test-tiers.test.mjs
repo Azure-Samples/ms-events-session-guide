@@ -63,11 +63,11 @@ test("PR gate combines code regressions with smoke, not the full browser matrix"
   assert.match(workflow, /npx playwright install --with-deps chromium\s*$/m);
 });
 
-test("full matrix remains scheduled and manually runnable without deployment privileges", async () => {
+test("full matrix runs only on demand without deployment privileges", async () => {
   const workflow = await readFile(new URL("../.github/workflows/e2e.yml", import.meta.url), "utf8");
   assert.match(workflow, /regression:\n\s+runs-on: ubuntu-24\.04/);
-  assert.match(workflow, /schedule:\n\s+- cron: "0 9 \* \* \*"/);
-  assert.match(workflow, /workflow_dispatch:/);
+  const triggers = workflow.split(/^on:\s*$/m)[1]?.split(/^permissions:/m)[0];
+  assert.equal(triggers?.trim(), "workflow_dispatch:");
   assert.match(workflow, /run: npm run test:e2e:full/);
   assert.match(workflow, /npx playwright install --with-deps chromium firefox webkit/);
   assert.match(workflow, /contents: read/);
