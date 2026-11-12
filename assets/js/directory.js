@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation. Licensed under the MIT license.
 // Event directory: progressive search, runtime highlights and status labels,
-// the legacy root-link bridge, and observed event-selection telemetry.
+// explicit and legacy root-link routing, and observed event-selection telemetry.
 // Without JavaScript the page remains a static list of event links.
 
 import {
@@ -46,7 +46,7 @@ function showRouteError(message) {
 
 // Returns true when the page is navigating away to an event. Invalid links
 // show a visible error and leave the directory usable; nothing is stored.
-async function bridgeLegacyLink(manifestPromise) {
+async function bridgeEventLink(manifestPromise) {
   if (!legacyRouteKind(location.search, location.hash)) return false;
   let result;
   try {
@@ -130,7 +130,7 @@ async function main() {
   setupTheme();
   wireEventLinks(document.body, () => telemetry);
   const manifestPromise = loadManifest();
-  if (await bridgeLegacyLink(manifestPromise)) return;
+  if (await bridgeEventLink(manifestPromise)) return;
   let manifest;
   try {
     manifest = await manifestPromise;
