@@ -47,7 +47,7 @@ test("actual smoke discovery stays small and selects genuine full-suite journeys
     assert.equal(entry.project, "chromium");
     assert.ok(complete.some((candidate) => candidate.project === entry.project && candidate.title === entry.title));
   }
-  for (const id of ["001", "010", "011", "012", "018", "022", "033", "050", "070", "073", "080", "082"]) {
+  for (const id of ["001", "010", "011", "012", "018", "022", "033", "050", "070", "073", "080", "082", "090"]) {
     assert.ok(quick.some((entry) => entry.title.includes(`E2E-${id}`)), `Missing critical E2E-${id}`);
   }
 });

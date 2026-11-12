@@ -7,6 +7,7 @@
 .devex-brand strong { font-size: 20px; font-weight: 600; letter-spacing: -.5px; line-height: 1.2; white-space: nowrap; }
 
 .devex-hero { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); align-items: center; gap: 48px; }
+.journey-intro.devex-hero { align-items: start; }
 .directory-hero.devex-hero { padding-block: 48px 32px; }
 .devex-hero-copy { min-width: 0; }
 .devex-hero h1 { font-size: clamp(40px, 4.7vw, 66px); font-weight: 600; letter-spacing: -2.5px; line-height: 1.08; }
@@ -15,7 +16,7 @@
 .devex-hero-art img { display: block; width: min(100%, 360px); height: auto; margin-inline: auto; }
 .eyebrow, .session-code, .journey-sequence, .path-number, .step-number, .path-fit span, .card-payoff span { font-family: "Cascadia Code", Consolas, "Courier New", Courier, monospace; }
 
-.journey-entry, .event-card { border-radius: 4px 16px 16px 16px; }
+.journey-entry, .event-card, .event-registration-notice { border-radius: 4px 16px 16px 16px; }
 .journey-entry-top .badge { padding: 4px 8px; border-color: var(--cp-accent-soft); background: var(--cp-accent-soft); color: var(--cp-accent); }
 .journey-entry h2 { font-weight: 600; }
 .journey-entry-custom { background: var(--cp-bg-elevated); }

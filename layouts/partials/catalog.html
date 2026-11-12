@@ -38,6 +38,9 @@
   "url" $meta.url
   "catalogVersion" $catalogVersion
 -}}
+{{- with $meta.registrationUrl -}}
+  {{- $event = merge $event (dict "registrationUrl" .) -}}
+{{- end -}}
 {{- $payload := merge $content (dict "event" $event) -}}
 {{- $resource := resources.FromString (printf "data/events/%s/catalog.json" $meta.id) (jsonify $payload) | fingerprint "sha256" -}}
 {{- $manifestEntry := merge $event (dict "catalogAssetUrl" $resource.RelPermalink "keywords" $meta.keywords) -}}

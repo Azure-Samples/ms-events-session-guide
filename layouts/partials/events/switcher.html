@@ -8,6 +8,7 @@
       <span class="event-identity-meta"><time datetime="{{ $current.startDate }}">{{ partial "events/date-range.html" $current }}</time> <span aria-hidden="true">&middot;</span> Event time {{ $current.timeZoneAbbreviation }} ({{ $current.timeZone }})</span>
     </div>
     <nav class="event-switcher" aria-label="Events">
+      {{ partial "events/registration.html" $current }}
       <details>
         <summary>Switch event <svg class="icon" aria-hidden="true"><use href="#i-arrow"></use></svg></summary>
         <ul class="event-switcher-list">

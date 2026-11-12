@@ -1,0 +1,5 @@
+{{- with .registrationUrl }}
+<div id="event-registration" class="event-registration">
+  <a id="event-registration-link" class="button button-primary" href="{{ . }}" target="_blank" rel="noopener noreferrer" aria-describedby="event-registration-note event-registration-destination" title="Event registration on the official website (opens in a new tab)."><span id="event-registration-label">Registration details</span><span class="sr-only"> for {{ $.name }}</span><span aria-hidden="true">&nearr;</span></a>
+</div>
+{{- end }}

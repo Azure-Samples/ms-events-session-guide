@@ -39,6 +39,30 @@ An empty, repeated, or unknown event selector shows an error and leaves the dire
 
 A vanity link such as `https://aka.ms/MsEventGuide?event=ignite-2026` works only if the redirect forwards the query string to the app.
 
+## Event registration
+
+An event can set optional `params.registrationUrl` to an edition-specific official
+registration destination. It must be an absolute HTTPS URL without credentials
+or whitespace; omit the field for events without a registration link. Ignite 2026
+uses `https://aka.ms/MSIgniteFY27RegNow`.
+
+Configured event pages include a compact registration button before "Switch event"
+in the event identity bar. The bar is part of the sticky site header, so registration
+remains accessible after selecting a guide. A visible reminder below the hero
+explains that users still need to register through the official event website:
+saving sessions does not register them or reserve session seats. This reminder
+is outside the catalog-dependent application, rather than only screen-reader text.
+It uses the same surface, faceted corners, typography and button styles as guide
+cards, with a separate official-registration action and stacked mobile layout.
+Anchor scrolling and the desktop guide sidebar account for the header's
+responsive height. The external link remains usable without JavaScript or when the
+catalog fails, and opens in a new tab without sending a referrer. Once event metadata
+loads, upcoming/current events show "Register"; past events show "Registration
+details" instead, using inclusive event-local dates. The accessible name includes
+the event name, with explanatory text and a past-event tooltip. This does not
+claim that registration is open/closed or that seats remain available. Registering
+for an event, reserving a session seat, and saving an agenda are separate actions.
+
 ## Calendar behavior
 
 Scheduled sessions and entire built-in, custom, or shared guides export as standard `.ics` downloads. Repeated sessions require a specific occurrence. Import requires the calendar client's confirmation; the app does not silently write to calendars.
@@ -84,7 +108,7 @@ Array order in `guides.json` determines audience/path ordering and defaults. Eac
 
 Add **only a new directory** under `content/events/EVENT_ID/`, containing:
 
-1. `index.md`: copy the Ignite front matter, set a permanent lowercase `params.eventId` equal to the directory name, title, summary, ISO start/end dates, IANA time zone, HTTPS official catalog URL, keywords, and `catalogFormat`. The event ID also defines its required `?event=EVENT_ID` mapping. Keep `build.publishResources: false`.
+1. `index.md`: copy the Ignite front matter, set a permanent lowercase `params.eventId` equal to the directory name, title, summary, ISO start/end dates, IANA time zone, HTTPS official catalog URL, keywords, and `catalogFormat`. Set optional `registrationUrl` to that event edition's official registration link, or omit it. The event ID also defines its required `?event=EVENT_ID` mapping. Keep `build.publishResources: false`.
 2. `catalog.json`: use `catalogFormat: normalized` for an object with `updated` and `instances`. Each instance has `id`, `sessionId`, `code`, `title`, `description`, `speakers`, `type`, `level`, `topics`, `delivery`, `audiences`, `viewing`, `start`, `end`, `duration`, and `location`. Use ISO times with offsets; both start/end may be empty for unscheduled sessions. The existing Ignite raw format is also supported through `catalogFormat: ignite`.
 3. `guides.json`: ordered `audiences: [{id, label}]` and `paths`. Paths use the existing `id`, `audience`, `name`, `label`, `headline`, `description`, `fit`, `outcome`, and `steps: [{code, stage, why, takeaway}]` fields.
 

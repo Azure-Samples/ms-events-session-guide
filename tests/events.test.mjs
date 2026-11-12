@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
-  eventDestination, eventLocalDate, eventStatus, legacyRouteKind, LEGACY_QUERY_PARAMETERS,
+  eventDestination, eventLocalDate, eventRegistration, eventStatus, legacyRouteKind, LEGACY_QUERY_PARAMETERS,
   resolveLegacyRoute, searchEvents, selectHighlights, validateManifest, wireEventLinks, wireEventSwitcher, preserveThemeForSiteLinks,
 } from "../assets/js/events.js";
 import { decodeGuide, encodeGuide, getGuideEventId } from "../assets/js/guides.js";
@@ -57,6 +57,33 @@ test("manifest validation accepts published metadata and rejects invalid events"
     [{ version: 1, events: [event({ keywords: [""] })] }, /keywords/],
   ];
   for (const [input, message] of invalid) assert.throws(() => validateManifest(input), message);
+});
+
+test("event registration URLs are optional, preserved and validated independently from catalog URLs", () => {
+  const registrationUrl = "https://example.com/register?event=ignite-2026&locale=en-US";
+  const configured = validateManifest({ version: 1, events: [event({ registrationUrl })] }).events[0];
+  assert.equal(configured.registrationUrl, registrationUrl);
+  assert.equal(configured.catalogUrl, event().catalogUrl);
+  assert.equal(Object.hasOwn(validateManifest({ version: 1, events: [event()] }).events[0], "registrationUrl"), false);
+  for (const value of ["", null, false, 42, "http://example.com/register", "//example.com/register",
+    "https:example.com", "javascript:alert(1)", "https://user:secret@example.com/",
+    "https://example.com/a b", "https://example.com/a\u00a0b", "https://example.com/\n", "https:\\\\example.com"]) {
+    assert.throws(() => validateManifest({ version: 1, events: [event({ registrationUrl: value })] }),
+      /registration URL must be an absolute HTTPS URL/);
+  }
+});
+
+test("event registration uses the event-local end date without claiming past registration is closed", () => {
+  const configured = event({ registrationUrl: "https://example.com/register" });
+  assert.equal(eventRegistration(event(), at("2026-11-18T12:00:00Z")), null);
+  for (const now of ["2026-11-01T12:00:00Z", "2026-11-18T12:00:00Z", "2026-11-21T07:59:59Z"]) {
+    assert.deepEqual(eventRegistration(configured, at(now)), {
+      url: configured.registrationUrl, label: "Register", past: false,
+    });
+  }
+  assert.deepEqual(eventRegistration(configured, at("2026-11-21T08:00:00Z")), {
+    url: configured.registrationUrl, label: "Registration details", past: true,
+  });
 });
 
 test("event status uses inclusive event-local calendar dates", () => {
@@ -428,6 +455,7 @@ test("production build publishes Ignite only, unchanged, with no raw resources",
     id: "ignite-2026", name: "Microsoft Ignite 2026", summary: manifest.events[0].summary,
     startDate: "2026-11-17", endDate: "2026-11-20", timeZone: "America/Los_Angeles",
     catalogUrl: "https://ignite.microsoft.com/en-US/sessions", url: "/events/ignite-2026/", catalogVersion: undefined,
+    registrationUrl: "https://aka.ms/MSIgniteFY27RegNow",
   });
   const home = await readFile(`${out}/index.html`, "utf8");
   assert.equal(home.match(/data-event-card/g)?.length, 1);
@@ -435,6 +463,11 @@ test("production build publishes Ignite only, unchanged, with no raw resources",
   assert.doesNotMatch(home, /telemetry-config|cookie-banner|privacy-settings/);
   assert.doesNotMatch(home, /data\/events\/ignite-2026\/catalog/, "discovery must not reference session catalogs");
   const page = await readFile(`${out}/events/ignite-2026/index.html`, "utf8");
+  assert.equal(catalog.event.registrationUrl, manifest.events[0].registrationUrl);
+  assert.match(page, /id=event-registration /);
+  assert.match(page, /id=event-registration-notice /);
+  assert.match(page, /href=https:\/\/aka\.ms\/MSIgniteFY27RegNow target=_blank rel="noopener noreferrer"/);
+  assert.match(page, /Saving sessions here does not register you for the event or reserve a session seat/);
   for (const html of [home, page]) {
     assert.equal(html.match(/class="brand devex-brand"/g)?.length, 2, "shared masthead and footer");
     assert.match(html, /DevEx Center of Excellence/);
@@ -483,6 +516,9 @@ test("fixture build supports two events, reused IDs, novel audiences, and reposi
     const fabrikam = await readJSON(out, /^data\/events\/fabrikam-summit-2027\/catalog\./);
     assert.ok(contoso.instances.some((item) => item.id === "S100-a" && item.code === "DEV100"));
     assert.ok(fabrikam.instances.some((item) => item.id === "S100-a" && item.code === "FAB100"));
+    assert.equal(contoso.event.registrationUrl, "https://example.com/contoso-dev-days/register");
+    assert.equal(manifest.events[0].registrationUrl, contoso.event.registrationUrl);
+    assert.equal(Object.hasOwn(fabrikam.event, "registrationUrl"), false);
     assert.deepEqual(contoso.guide.audiences.map((item) => item.id), ["startup", "nonprofit"]);
     assert.deepEqual(fabrikam.guide.audiences, [{ id: "public-sector", label: "Public sector" }]);
     assert.equal(contoso.instances.find((item) => item.id === "S400-a").start, "");
@@ -495,6 +531,7 @@ test("fixture build supports two events, reused IDs, novel audiences, and reposi
     assert.match(home, /Fixture preview/);
     assert.doesNotMatch(home, /<\/script><b>/);
     const page = await readFile(`${out}/events/fabrikam-summit-2027/index.html`, "utf8");
+    assert.doesNotMatch(page, /id=event-registration[ >]/);
     assert.match(page, /data-audience=public-sector aria-pressed=true>Public sector</);
     assert.match(page, /class=audience-control hidden/);
     assert.match(page, /href=\/repo\/events\/contoso-dev-days-2026\/ data-event-id=contoso-dev-days-2026 data-event-source=switcher/);
@@ -528,6 +565,12 @@ const invalidCases = [
   ["impossible date", "contoso-dev-days-2026/index.md", (s) => s.replace('"2026-11-09"', '"2026-02-30"'), /startDate must be a quoted calendar date/],
   ["end before start", "contoso-dev-days-2026/index.md", (s) => s.replace('"2026-11-13"', '"2026-11-01"'), /endDate must not be before/],
   ["non-HTTPS catalog", "contoso-dev-days-2026/index.md", (s) => s.replace("https://example.com", "http://example.com"), /catalogUrl must be an absolute HTTPS URL/],
+  ["non-HTTPS registration", "contoso-dev-days-2026/index.md", (s) => s.replace("registrationUrl: https:", "registrationUrl: http:"), /registrationUrl must be an absolute HTTPS URL/],
+  ["relative registration", "contoso-dev-days-2026/index.md", (s) => s.replace("registrationUrl: https://example.com/contoso-dev-days/register", "registrationUrl: /register"), /registrationUrl must be an absolute HTTPS URL/],
+  ["registration credentials", "contoso-dev-days-2026/index.md", (s) => s.replace("registrationUrl: https://", "registrationUrl: https://user:secret@"), /registrationUrl must be an absolute HTTPS URL/],
+  ["empty registration", "contoso-dev-days-2026/index.md", (s) => s.replace("registrationUrl: https://example.com/contoso-dev-days/register", 'registrationUrl: ""'), /registrationUrl must be an absolute HTTPS URL/],
+  ["registration whitespace", "contoso-dev-days-2026/index.md", (s) => s.replace("registrationUrl: https://example.com/contoso-dev-days/register", 'registrationUrl: "https://example.com/a b"'), /registrationUrl must be an absolute HTTPS URL/],
+  ["registration Unicode whitespace", "contoso-dev-days-2026/index.md", (s) => s.replace("registrationUrl: https://example.com/contoso-dev-days/register", 'registrationUrl: "https://example.com/a\\u00a0b"'), /registrationUrl must be an absolute HTTPS URL/],
   ["unknown format", "contoso-dev-days-2026/index.md", (s) => s.replace("catalogFormat: ignite", "catalogFormat: csv"), /catalogFormat must be/],
   ["URL override", "contoso-dev-days-2026/index.md", (s) => s.replace("build:", "url: /elsewhere/\nbuild:"), /URLs are fixed/],
   ["unknown curated session", "contoso-dev-days-2026/guides.json", (s) => s.replace('"code": "DEV200"', '"code": "NOPE1"'), /references unknown session code "NOPE1"/],

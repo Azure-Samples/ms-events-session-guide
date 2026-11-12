@@ -10,7 +10,7 @@ neither passing unit tests nor the browser subset certifies unimplemented
 variants or actual client imports. Do not push or deploy as part of local testing.
 
 For routine PRs run `npm ci`, `npx playwright install chromium`, then
-`npm run test:pr`: direct-code unit/model/build regressions followed by 12
+`npm run test:pr`: direct-code unit/model/build regressions followed by 13
 tagged Chromium UI journeys. The smoke config builds only the two-event site
 and writes `test-results/e2e-smoke*`, including a separate HTML report; use
 `npm run test:e2e:smoke:report` to open it. Smoke uses the same actual tests as
@@ -50,6 +50,7 @@ UI wiring, persistence, independent recipients and actual downloaded artifacts.
 | `integration.spec.mjs` | 014, 039, 059, 078, 086 sequential downloads, 088 two-tab persisted edits. |
 | `workflows.spec.mjs` | Agenda, repeated occurrence choice, guide editing, immutable shares, changed/removed catalog snapshots, actual calendar downloads; case IDs are in each test title. |
 | `navigation.spec.mjs` | 070-075, 080-081: directory, selectors, actual `/repo/` deployment, dropdown, exact filters, retry and no-JavaScript fallback. |
+| `registration.spec.mjs` | 090: event-specific registration, sticky event-bar placement, external navigation, absent URLs, past dates, failed catalogs, repository prefixes and no-JavaScript access. |
 | `resilience.spec.mjs` | 082 access/quota faults, 083 corrupt JSON recovery, 087 attempted-telemetry observation, 089 real held Web Lock. |
 | `share-errors.spec.mjs` | 033 denied clipboard; 040 malformed/semantic/expansion errors; 041 unavailable compression/decompression; 042-043 gated native stream races. |
 | `clipboard.spec.mjs` | 033 native allowed clipboard round-trip and 077 copied public view links on desktop Chromium only. |
@@ -1022,6 +1023,30 @@ held, a deliberately attempted navigation may show the expected unsaved-change
 prompt; cancel that navigation, release the lock, and require normal durability
 before the final reload. Capture that prompt rather than globally auto-accepting
 unexpected beforeunload dialogs in other cases.
+
+## Event registration
+
+### E2E-090 [P0] Event registration is distinct from agenda saving and seat reservations
+**Given** C has `registrationUrl: https://example.com/contoso-dev-days/register`
+and F omits it.
+**When** a user opens C's registration link.
+**Then** the exact configured URL opens in a new tab without a referrer, private
+view-state parameters, or changes to the local agenda/draft. This link is not a
+session-seat reservation or proof of registration.
+
+The compact registration button precedes "Switch event" in the sticky event header.
+A separate visible reminder below the hero links to the official registration
+website and states that saving sessions does not register attendees or reserve
+session seats. The reminder is not hidden as screen-reader-only text.
+The header button remains in the viewport after
+choosing a journey, with the guide heading below the header rather than obscured.
+Desktop guide cards remain fully visible on initial opening at a 900px height.
+F has no registration control. C's link remains usable without JavaScript or when
+catalog loading fails. After C's event-local end date, the CTA offers registration
+details and notes the event has ended, without inventing a registration-closed
+state. The external URL stays unchanged under `/repo/`. The `/real/` Ignite page
+uses `https://aka.ms/MSIgniteFY27RegNow`. Browser tests mock only the known fixture
+destination; they never submit a registration or visit the real booking service.
 
 ## Completion and reporting
 

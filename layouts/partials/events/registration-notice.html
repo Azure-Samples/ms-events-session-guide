@@ -1,0 +1,14 @@
+{{- with .registrationUrl }}
+<aside id="event-registration-notice" class="container event-registration-notice" aria-labelledby="event-registration-heading">
+  <div class="registration-notice-copy">
+    <p class="eyebrow">ATTEND THE EVENT</p>
+    <h2 id="event-registration-heading">Event registration</h2>
+    <p id="event-registration-note">Saving sessions here does not register you for the event or reserve a session seat.</p>
+    <p id="event-registration-ended" hidden>This event has ended. Check the official registration site for any remaining options.</p>
+  </div>
+  <div class="registration-notice-action">
+    <a class="button" href="{{ . }}" target="_blank" rel="noopener noreferrer" aria-describedby="event-registration-destination">Official registration <svg class="icon" aria-hidden="true"><use href="#i-arrow-up"></use></svg></a>
+    <p id="event-registration-destination">Opens the event website in a new tab.</p>
+  </div>
+</aside>
+{{- end }}
