@@ -52,11 +52,12 @@ test("actual smoke discovery stays small and selects genuine full-suite journeys
   }
 });
 
-test("PR gate combines code regressions with smoke, not the full browser matrix", async () => {
+test("fast PR job combines code regressions with smoke, separate from the full browser matrix", async () => {
   const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   assert.equal(pkg.scripts["test:pr"], "npm test && npm run test:e2e:smoke");
   const workflow = await readFile(new URL("../.github/workflows/pages.yml", import.meta.url), "utf8");
   assert.match(workflow, /build:\n\s+runs-on: ubuntu-24\.04/);
+  assert.match(workflow, /name: Code checks, Chromium smoke and build/);
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /run: npm test/);
   assert.match(workflow, /run: npm run test:e2e:smoke/);
@@ -64,11 +65,13 @@ test("PR gate combines code regressions with smoke, not the full browser matrix"
   assert.match(workflow, /npx playwright install --with-deps chromium\s*$/m);
 });
 
-test("full matrix runs only on demand without deployment privileges", async () => {
+test("full matrix reports native PR checks or runs on demand, never on a schedule", async () => {
   const workflow = await readFile(new URL("../.github/workflows/e2e.yml", import.meta.url), "utf8");
   assert.match(workflow, /regression:\n\s+runs-on: ubuntu-24\.04/);
   const triggers = workflow.split(/^on:\s*$/m)[1]?.split(/^permissions:/m)[0];
-  assert.equal(triggers?.trim(), "workflow_dispatch:");
+  assert.deepEqual([...triggers.matchAll(/^  ([a-z_]+):/gm)].map(([, event]) => event),
+    ["pull_request", "workflow_dispatch"]);
+  assert.match(workflow, /name: Browser E2E \(\$\{\{ matrix\.project \}\}\)/);
   assert.match(workflow, /run: npm run test:e2e:full/);
   assert.match(workflow, /contents: read/);
   assert.doesNotMatch(workflow, /pages: write|id-token: write|deploy-pages|pull_request_target/);
@@ -85,5 +88,5 @@ test("hosted full coverage isolates projects and bounds browser workers per runn
   assert.match(workflow, /npx playwright install --with-deps \$\{\{ matrix\.browser \}\}/);
   assert.match(workflow, /--project=\$\{\{ matrix\.project \}\} --workers=2/);
   assert.match(workflow, /name: e2e-full-\$\{\{ matrix\.project \}\}-\$\{\{ github\.run_id \}\}/);
-  assert.match(workflow, /if: matrix\.project == 'chromium'\n\s+run: npm test/);
+  assert.match(workflow, /if: matrix\.project == 'chromium' && github\.event_name == 'workflow_dispatch'\n\s+run: npm test/);
 });

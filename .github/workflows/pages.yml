@@ -19,6 +19,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    name: Code checks, Chromium smoke and build
     permissions:
       contents: read
       pages: read

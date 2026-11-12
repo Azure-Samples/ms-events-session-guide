@@ -2,7 +2,7 @@
 
 Find Microsoft events, explore curated session paths, and build a personal guide with calendar downloads and shareable links.
 
-[Open the MS Events Session Guide](https://aka.ms/MsEventGuide).
+[Open the MS Events Session Guide](https://azure-samples.github.io/ms-events-session-guide/).
 
 Predefined guides are curated and published by internal Microsoft teams.
 
@@ -39,15 +39,16 @@ npm run test:pr
 | --- | --- | --- |
 | `npm test` | Direct-code unit/model regressions, workflow guards, and Hugo build checks; no browser processes. | Every PR; during development. |
 | `npm run test:e2e:smoke` | 12 tagged critical Chromium journeys: Save/reload/repeats, event isolation, guide/share/download, navigation, and recovery. | Every PR. |
-| `npm run test:pr` | Both fast gates above. | Local pre-PR check. |
+| `npm run test:pr` | Both fast gates above. | Local fast pre-PR check. |
 | `npm run test:e2e:chromium` | Broader single-engine browser regression. | Relevant UI changes/debugging. |
-| `npm run test:e2e:full` | Full desktop/mobile Chromium, Firefox, and WebKit matrix (also `npm run test:e2e`). | On demand before merge or release. |
+| `npm run test:e2e:full` | Full desktop/mobile Chromium, Firefox, and WebKit matrix (also `npm run test:e2e`). | Every PR; manual/pre-release. |
 
 For the full matrix, first run `npx playwright install chromium firefox webkit`.
-GitHub Actions runs code regressions plus smoke on PRs and main pushes; the full
-workflow runs only through manual dispatch, for example before merge or release.
-There is no recurring schedule.
-The manual workflow isolates the five browser projects on separate runners with
+GitHub Actions runs code regressions plus smoke on PRs and main pushes. The full
+workflow runs automatically on PRs and remains manually dispatchable before release.
+PRs show a named code/smoke/build check and five `Browser E2E` checks; results come
+directly from the PR workflows, not manually posted statuses. There is no recurring schedule.
+The full workflow isolates the five browser projects on separate runners with
 two workers each, retaining a separate report artifact for each project.
 Functional journeys use reduced motion to avoid scrolling-animation races;
 responsive presentation checks retain normal motion.
