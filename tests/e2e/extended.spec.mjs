@@ -81,7 +81,9 @@ test('E2E-026 twentieth unique session is accepted, twenty-first rejected, remov
     steps: LIMIT_FACTS.slice(0, 20).map((session) => ({ session, note: '' })),
   };
   await waitDraft(page, initialDraft);
-  await addSession(page, LIMIT_FACTS[20]);
+  const overflow = await findSession(page, LIMIT_FACTS[20].code);
+  await overflow.getByRole('button', { name: 'Add X021 to custom guide', exact: true }).click();
+  await expect(overflow.locator('.card-guide-button')).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('#toast')).toHaveText('Your guide can contain up to 20 sessions. Remove one before adding another.');
   await expectDraftCodes(page, LIMIT_CODES.slice(0, 20));
   await waitDraft(page, initialDraft);
