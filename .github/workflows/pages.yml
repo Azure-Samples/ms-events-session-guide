@@ -80,7 +80,6 @@ jobs:
           HUGO_TELEMETRY_CONSENT_MODE: wcp
           HUGO_TELEMETRY_CONNECTION_STRING: ${{ vars.HUGO_TELEMETRY_CONNECTION_STRING }}
           HUGO_TELEMETRY_ORIGIN: ${{ vars.HUGO_TELEMETRY_ORIGIN }}
-          HUGO_TELEMETRY_PRODUCTION_APPROVED: ${{ vars.HUGO_TELEMETRY_PRODUCTION_APPROVED || 'false' }}
           HUGO_TELEMETRY_BUILD_ID: ${{ github.sha }}
           SITE_BASE_URL: ${{ steps.pages.outputs.base_url || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
         run: hugo --gc --minify --cleanDestinationDir --baseURL "${SITE_BASE_URL}/"

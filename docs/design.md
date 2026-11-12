@@ -86,7 +86,7 @@ HUGO_TELEMETRY_ENABLED=false npm run build
 
 Disabling application analytics does not disable GitHub's hosting/access logs, and a requested share URL still reaches its hosting provider.
 
-Explicit analytics builds require `HUGO_TELEMETRY_ENABLED=true`, `HUGO_TELEMETRY_ENV=production` or `test`, `HUGO_TELEMETRY_CONNECTION_STRING`, an approved `HUGO_TELEMETRY_ORIGIN`, and an optional bounded `HUGO_TELEMETRY_BUILD_ID`. Production additionally requires `HUGO_TELEMETRY_PRODUCTION_APPROVED=true` **only after** the WCP/domain/privacy and ingested-data checks are complete. A local `test` build may explicitly select `HUGO_TELEMETRY_CONSENT_MODE=test`; its clearly labelled test adapter is excluded from production and is not a production consent approval.
+Explicit analytics builds require `HUGO_TELEMETRY_ENABLED=true`, `HUGO_TELEMETRY_ENV=production` or `test`, `HUGO_TELEMETRY_CONNECTION_STRING`, a matching HTTPS `HUGO_TELEMETRY_ORIGIN`, and an optional bounded `HUGO_TELEMETRY_BUILD_ID`. Production uses WCP consent. A local `test` build may explicitly select `HUGO_TELEMETRY_CONSENT_MODE=test`; its clearly labelled test adapter is excluded from production.
 
 Connection strings are public browser ingestion configuration, not query or management credentials. Keep environment-specific values out of source, use deployment-environment variables when publishing later, and never embed workspace shared keys or Azure tokens. Do not give PR builds production configuration.
 
@@ -97,9 +97,8 @@ The Pages workflow reads these repository Actions variables only for deployment 
 | `HUGO_TELEMETRY_ENABLED` | `true` to include the analytics integration; defaults to `false` |
 | `HUGO_TELEMETRY_CONNECTION_STRING` | Connection string from your Application Insights resource |
 | `HUGO_TELEMETRY_ORIGIN` | Exact HTTPS origin from the repository's Pages deployment URL, without a path |
-| `HUGO_TELEMETRY_PRODUCTION_APPROVED` | `true` only after verifying consent and privacy on that domain; defaults to `false` |
 
-The workflow fixes the environment to `production`, uses WCP consent, and tags events with the commit SHA. PR and non-main preview builds explicitly disable telemetry and receive none of these deployment variables. Including analytics without production approval does not start collection. After changing variables, rebuild and deploy `main` to apply them; they are embedded at build time.
+The workflow fixes the environment to `production`, uses WCP consent, and tags events with the commit SHA. PR and non-main preview builds explicitly disable telemetry and receive none of these deployment variables. There is no separate release-approval flag; collection depends on the enable switch, valid configuration, and visitor consent. After changing variables, rebuild and deploy `main` to apply them; they are embedded at build time.
 
 The optional Azure templates provision Application Insights `ms-events-guide`, linked to dedicated workspace `ms-events-guide-logs`, in your selected subscription and existing resource group. Configure `AppEvents` for **730-day interactive and total retention** after its first ingestion. The workspace cap is disabled (`-1`); Application Insights additionally has an **Azure-default 100 GB/day component limit**. Ingestion and two-year retention are billable.
 
@@ -124,7 +123,7 @@ Read the connection string from the new component's Overview page. Read back wor
 
 Application Insights can derive geolocation, browser and OS from request metadata even when the client payload omits them. The separately approved `ms-events-guide-privacy` workspace transformation removes those fields and visitor/session/operation identities **before storage in AppEvents**. It does not filter out the business events or their session composition. `infra/privacy-transform.json` and `scripts/configure-telemetry-privacy.sh` configure it only on this dedicated workspace; rerunning the core provisioning script preserves that association.
 
-Transformations apply to newly ingested records, not older smoke-test rows. Verify stored post-transformation rows before production activation; a clean client envelope alone is not proof that server enrichment is absent. Default app builds and production collection remain disabled until explicitly configured and approved.
+Transformations apply to newly ingested records, not older smoke-test rows. Verify stored post-transformation rows before production activation; a clean client envelope alone is not proof that server enrichment is absent. Default app builds remain telemetry-disabled; enabled builds collect only when configuration and visitor consent permit.
 
 ## Analyze the data
 

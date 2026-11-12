@@ -57,12 +57,8 @@
   {{- if or (not (in (slice "wcp" "test") $mode)) (and (eq $mode "test") (ne $environment "test")) -}}
     {{- errorf "Test consent is available only with HUGO_TELEMETRY_ENV=test" -}}
   {{- end -}}
-  {{- $approval := os.Getenv "HUGO_TELEMETRY_PRODUCTION_APPROVED" -}}
-  {{- if not (in (slice "" "true" "false") $approval) -}}
-    {{- errorf "HUGO_TELEMETRY_PRODUCTION_APPROVED must be true, false, or unset" -}}
-  {{- end -}}
   {{- $buildId := os.Getenv "HUGO_TELEMETRY_BUILD_ID" | default "local" -}}
   {{- if not (findRE `^[A-Za-z0-9._:-]{1,100}$` $buildId) -}}{{- errorf "Invalid telemetry build ID" -}}{{- end -}}
-  {{- $config = dict "enabled" true "connectionString" $connection "environment" $environment "origin" $origin "buildId" $buildId "consentMode" $mode "productionApproved" (eq $approval "true") -}}
+  {{- $config = dict "enabled" true "connectionString" $connection "environment" $environment "origin" $origin "buildId" $buildId "consentMode" $mode -}}
 {{- end -}}
 {{- return (dict "enabled" $enabled "config" $config) -}}

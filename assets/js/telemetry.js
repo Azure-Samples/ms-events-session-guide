@@ -67,7 +67,7 @@ export function validateTelemetryConfig(config, currentOrigin) {
       (config.consentMode === "test" && config.environment !== "test")) throw new Error("invalid-consent-mode");
   return Object.freeze({ ...parseTelemetryConnectionString(config.connectionString),
     enabled: true, environment: config.environment, buildId: config.buildId, origin: config.origin,
-    consentMode: config.consentMode, productionApproved: config.productionApproved === true });
+    consentMode: config.consentMode });
 }
 
 export function splitTelemetryComposition(instances, catalog, eventId, maximumBytes = COMPOSITION_BYTES) {
@@ -169,13 +169,6 @@ function initializeEnabledTelemetry({ events = [], catalog = null, config, sdkFa
     const button = document?.getElementById("privacy-settings");
     if (button) button.disabled = true;
     return disabledFacade(settings ? "disabled" : "configuration-error");
-  }
-  if (settings.environment === "production" && !settings.productionApproved) {
-    const status = document?.getElementById("telemetry-status");
-    if (status) status.textContent = "Optional analytics disabled pending privacy and consent registration approval.";
-    const button = document?.getElementById("privacy-settings");
-    if (button) button.disabled = true;
-    return disabledFacade("approval-required");
   }
   const eventIds = new Set(events.map((event) => event?.id).filter((id) => typeof id === "string" && IDENTIFIER.test(id)));
   let state = "waiting-for-consent";

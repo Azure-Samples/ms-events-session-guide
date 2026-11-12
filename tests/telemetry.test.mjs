@@ -176,10 +176,9 @@ test("unknown, forged and foreign-event snapshot membership is counted without l
   assert.throws(() => splitTelemetryComposition(unicode.instances, unicode, events[0].id), /composition-item-too-large/);
 });
 
-test("disabled, invalid-config and unapproved production facades never start consent or SDK", async () => {
+test("disabled and invalid-config facades never start consent or SDK", async () => {
   let started = 0;
-  for (const settings of [{ enabled: false }, config({ origin: "https://wrong.example" }),
-    config({ environment: "production", consentMode: "wcp" })]) {
+  for (const settings of [{ enabled: false }, config({ origin: "https://wrong.example" })]) {
     const runtime = initializeTelemetry({ config: settings, consentProvider: { start() { started += 1; } },
       sdkFactory() { started += 1; }, platform: browser() });
     assert.equal(selection(runtime).state, "dropped");
@@ -189,6 +188,22 @@ test("disabled, invalid-config and unapproved production facades never start con
     runtime.dispose();
   }
   assert.equal(started, 0);
+});
+
+test("production telemetry needs enabled configuration and consent, not a separate release flag", async (t) => {
+  const h = harness(t, { initial: null, settings: { environment: "production", consentMode: "wcp" } });
+  await settle();
+  assert.equal(h.runtime.status, "waiting-for-consent");
+  assert.equal(selection(h.runtime).state, "dropped");
+  assert.equal(h.instances.length, 0);
+  h.provider.choose(true);
+  await settle();
+  assert.equal(h.runtime.status, "ready");
+  assert.equal(selection(h.runtime).state, "submitted");
+  assert.equal(h.instances[0].rows.length, 1);
+  h.provider.choose(false);
+  assert.equal(selection(h.runtime).state, "dropped");
+  assert.equal(h.instances[0].rows.length, 1);
 });
 
 test("unconsented actions never queue or replay; consent allows only later explicit actions", async (t) => {

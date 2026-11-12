@@ -35,8 +35,8 @@ The approved workspace ingestion transformation removes service-derived
 browser, OS, device/location and visitor/session/operation identifiers before
 new records are stored. It does not retroactively alter earlier smoke-test
 records. Normal network infrastructure still processes request metadata.
-Production collection remains subject to privacy/WCP approval and verification
-of stored post-transformation rows.
+Production collection requires valid deployment configuration and available
+visitor consent through WCP. Verify stored post-transformation rows.
 
 Share links contain their snapshots and notes in the query string. Do not
 include private information. Encoding is not encryption. A requested URL

@@ -47,7 +47,7 @@ test("Pages telemetry configuration is restricted to main deployment builds", as
   const deployment = source.split("- name: Build Hugo with the deployment base URL\n")[1]?.split("\n      # Package")[0];
   assert.ok(deployment);
   assert.ok(deployment.includes("if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'"));
-  for (const setting of ["ENABLED", "CONNECTION_STRING", "ORIGIN", "PRODUCTION_APPROVED"]) {
+  for (const setting of ["ENABLED", "CONNECTION_STRING", "ORIGIN"]) {
     assert.ok(deployment.includes(`vars.HUGO_TELEMETRY_${setting}`));
   }
   assert.ok(deployment.includes("HUGO_TELEMETRY_ENV: production"));
