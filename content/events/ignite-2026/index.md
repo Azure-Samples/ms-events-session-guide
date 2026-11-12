@@ -13,6 +13,7 @@ params:
   endDate: "2026-11-20"
   timeZone: America/Los_Angeles
   catalogUrl: https://ignite.microsoft.com/en-US/sessions
+  registrationUrl: https://aka.ms/MSIgniteFY27RegNow
   catalogFormat: ignite
   keywords: [Ignite, Microsoft, San Francisco, Moscone, AI, Azure, startups, digital natives]
 ---

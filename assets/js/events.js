@@ -72,6 +72,16 @@ export function eventStatus(event, now = new Date()) {
   return "ongoing";
 }
 
+export function eventRegistration(event, now = new Date()) {
+  if (!event.registrationUrl) return null;
+  const past = eventStatus(event, now) === "past";
+  return {
+    url: event.registrationUrl,
+    label: past ? "Registration details" : "Register",
+    past,
+  };
+}
+
 export const STATUS_LABELS = Object.freeze({
   ongoing: "Happening now", upcoming: "Upcoming", past: "Past event",
 });

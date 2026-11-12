@@ -59,14 +59,21 @@ export function validateEvent(event) {
     throw new Error("Event dates must be valid and in chronological order.");
   }
   validateTimeZone(event.timeZone);
-  let official;
-  try {
-    official = new URL(event.catalogUrl);
-  } catch (cause) {
-    throw new Error("Event catalog URL must be an absolute HTTPS URL.", { cause });
-  }
-  if (official.protocol !== "https:" || official.username || official.password) {
-    throw new Error("Event catalog URL must be an absolute HTTPS URL without credentials.");
+  for (const [field, label] of [["catalogUrl", "catalog"], ["registrationUrl", "registration"]]) {
+    if (field === "registrationUrl" && event[field] === undefined) continue;
+    const value = event[field];
+    if (typeof value !== "string" || !value.startsWith("https://") || /[\s\x00-\x20\x7f\\]/.test(value)) {
+      throw new Error(`Event ${label} URL must be an absolute HTTPS URL without credentials or whitespace.`);
+    }
+    let official;
+    try {
+      official = new URL(value);
+    } catch (cause) {
+      throw new Error(`Event ${label} URL must be an absolute HTTPS URL.`, { cause });
+    }
+    if (official.protocol !== "https:" || official.username || official.password) {
+      throw new Error(`Event ${label} URL must be an absolute HTTPS URL without credentials.`);
+    }
   }
   if (typeof event.url !== "string" || !event.url.startsWith("/") || event.url.startsWith("//") ||
       /[\x00-\x20\\]/.test(event.url)) {
@@ -76,5 +83,6 @@ export function validateEvent(event) {
     id: event.id, name: event.name, summary: event.summary, startDate: event.startDate,
     endDate: event.endDate, timeZone: event.timeZone, catalogUrl: event.catalogUrl,
     url: event.url, catalogVersion: event.catalogVersion,
+    ...(event.registrationUrl === undefined ? {} : { registrationUrl: event.registrationUrl }),
   });
 }

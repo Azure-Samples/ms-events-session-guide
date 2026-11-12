@@ -59,15 +59,21 @@
   {{- errorf "%s: params.timeZone must be an IANA time zone such as America/Los_Angeles" $where -}}
 {{- end -}}
 
-{{- $catalogUrl := index $params "catalogurl" -}}
-{{- $validUrl := false -}}
-{{- if and (eq (printf "%T" $catalogUrl) "string") (not (findRE `\s` $catalogUrl 1)) -}}
-  {{- with try (urls.Parse $catalogUrl) -}}
-    {{- if and (not .Err) (eq .Value.Scheme "https") .Value.Host (not .Value.User) -}}{{- $validUrl = true -}}{{- end -}}
+{{- $officialUrls := dict -}}
+{{- range $field := slice "catalogUrl" "registrationUrl" -}}
+  {{- if or (eq $field "catalogUrl") (isset $params (lower $field)) -}}
+    {{- $value := index $params (lower $field) -}}
+    {{- $validUrl := false -}}
+    {{- if and (eq (printf "%T" $value) "string") (not (findRE `[\s\p{Z}\x00-\x20\x7f\x{FEFF}\\]` $value 1)) -}}
+      {{- with try (urls.Parse $value) -}}
+        {{- if and (not .Err) (eq .Value.Scheme "https") .Value.Host (not .Value.User) -}}{{- $validUrl = true -}}{{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if not $validUrl -}}
+      {{- errorf "%s: params.%s must be an absolute HTTPS URL without credentials or whitespace" $where $field -}}
+    {{- end -}}
+    {{- $officialUrls = merge $officialUrls (dict $field $value) -}}
   {{- end -}}
-{{- end -}}
-{{- if not $validUrl -}}
-  {{- errorf "%s: params.catalogUrl must be an absolute HTTPS URL without credentials" $where -}}
 {{- end -}}
 
 {{- $format := index $params "catalogformat" -}}
@@ -89,7 +95,7 @@
 
 {{- $tzAbbreviation := (time.AsTime (printf "%sT12:00:00" $dates.startDate) $timeZone).Format "MST" -}}
 
-{{- return dict
+{{- $metadata := dict
   "id" $id
   "name" $name
   "summary" (strings.TrimSpace $summary)
@@ -97,8 +103,8 @@
   "endDate" $dates.endDate
   "timeZone" $timeZone
   "timeZoneAbbreviation" $tzAbbreviation
-  "catalogUrl" $catalogUrl
   "catalogFormat" $format
   "keywords" $keywords
   "url" $page.RelPermalink
 -}}
+{{- return merge $metadata $officialUrls -}}

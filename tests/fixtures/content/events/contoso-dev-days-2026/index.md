@@ -10,6 +10,7 @@ params:
   endDate: "2026-11-13"
   timeZone: America/New_York
   catalogUrl: https://example.com/contoso-dev-days/sessions
+  registrationUrl: https://example.com/contoso-dev-days/register
   catalogFormat: ignite
   keywords: [fixture, Contoso, Montréal]
 ---

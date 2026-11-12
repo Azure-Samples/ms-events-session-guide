@@ -9,6 +9,7 @@ Predefined guides are curated and published by internal Microsoft teams.
 ## Features
 
 - Search events and session catalogs.
+- Open each event's official registration site when a registration link is configured.
 - Follow audience-specific paths or build your own guide.
 - Save event-specific agendas, spot conflicts, and download calendar events.
 - Share a snapshot of your guide, including session order and notes.
@@ -38,7 +39,7 @@ npm run test:pr
 | Command | Scope | When |
 | --- | --- | --- |
 | `npm test` | Direct-code unit/model regressions, workflow guards, and Hugo build checks; no browser processes. | Every PR; during development. |
-| `npm run test:e2e:smoke` | 12 tagged critical Chromium journeys: Save/reload/repeats, event isolation, guide/share/download, navigation, and recovery. | Every PR. |
+| `npm run test:e2e:smoke` | 13 tagged critical Chromium journeys: Save/reload/repeats, event isolation, guide/share/download, event registration, navigation, and recovery. | Every PR. |
 | `npm run test:pr` | Both fast gates above. | Local fast pre-PR check. |
 | `npm run test:e2e:chromium` | Broader single-engine browser regression. | Relevant UI changes/debugging. |
 | `npm run test:e2e:full` | Full desktop/mobile Chromium, Firefox, and WebKit matrix (also `npm run test:e2e`). | Every PR; manual/pre-release. |

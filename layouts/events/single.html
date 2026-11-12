@@ -20,7 +20,7 @@
   {{- if site.Params.fixturePreview }}
   <p class="fixture-banner" role="note">Fixture preview: test events only. Not production content.</p>
   {{- end }}
-  <header class="site-header">
+  <header class="site-header" id="event-header">
     <div class="header-inner container">
       {{ partial "devex-brand.html" . }}
       <nav class="main-nav" aria-label="Main navigation">
@@ -33,8 +33,8 @@
         <svg class="icon" aria-hidden="true"><use href="#i-sun"></use></svg>
       </button>
     </div>
+    {{ partial "events/switcher.html" (dict "current" $event "manifest" $manifest) }}
   </header>
-  {{ partial "events/switcher.html" (dict "current" $event "manifest" $manifest) }}
   <main id="main">
     <section id="top" class="journey-hero container" aria-label="Choose your {{ $event.name }} journey">
       <div class="journey-intro devex-hero">
@@ -53,6 +53,8 @@
         <a class="text-link" href="#catalog">Browse the full catalog <span aria-hidden="true">&nearr;</span></a>
       </div>
     </section>
+
+    {{ partial "events/registration-notice.html" $event }}
 
     <div class="loading-notice container" id="loading-notice" role="status">Preparing your {{ $event.name }} guide&hellip;</div>
     <div class="error-notice container" id="load-error" role="alert" hidden>

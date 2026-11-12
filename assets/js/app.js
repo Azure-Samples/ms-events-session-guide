@@ -11,7 +11,7 @@ import { GUIDE_LIMITS, snapshotSession, validateGuide, decodeGuide, createShareU
 import { LEGACY_EVENT, LEGACY_EVENT_ID } from "./event-context.js";
 import { eventStorageKeys, migrateLegacyStorage, withEventStorageLock, validateStoredDraft } from "./event-state.js";
 import { initializeTelemetry } from "./telemetry.js";
-import { preserveThemeForSiteLinks, validateManifest, wireEventLinks, wireEventSwitcher } from "./events.js";
+import { eventRegistration, preserveThemeForSiteLinks, validateManifest, wireEventLinks, wireEventSwitcher } from "./events.js";
 
 const $ = (id) => document.getElementById(id);
 let storageKeys = eventStorageKeys(LEGACY_EVENT_ID);
@@ -1046,6 +1046,24 @@ function restoreLocalData() {
   }
 }
 
+function renderRegistration() {
+  const section = $("event-registration");
+  if (!section) return;
+  const registration = eventRegistration(catalog.event);
+  section.hidden = !registration;
+  if (registration) {
+    $("event-registration-link").href = registration.url;
+    $("event-registration-label").textContent = registration.label;
+    $("event-registration-ended").hidden = !registration.past;
+    $("event-registration-link").setAttribute("aria-describedby",
+      registration.past ? "event-registration-note event-registration-destination event-registration-ended"
+        : "event-registration-note event-registration-destination");
+    $("event-registration-link").title = registration.past
+      ? $("event-registration-ended").textContent
+      : "Event registration on the official website (opens in a new tab).";
+  }
+}
+
 async function boot() {
   $("load-error").hidden = true;
   $("loading-notice").hidden = false;
@@ -1053,6 +1071,7 @@ async function boot() {
     const response = await fetch(document.body.dataset.catalog);
     if (!response.ok) throw new Error(`Catalog request returned HTTP ${response.status}.`);
     catalog = createCatalog(await response.json());
+    renderRegistration();
     const manifestResponse = await fetch(document.body.dataset.events);
     if (!manifestResponse.ok) throw new Error(`Event directory request returned HTTP ${manifestResponse.status}.`);
     const manifest = validateManifest(await manifestResponse.json());
@@ -1113,5 +1132,9 @@ $("theme-toggle").addEventListener("click", () => {
   $("theme-toggle").setAttribute("aria-label", `Switch to ${next === "dark" ? "light" : "dark"} theme`);
 });
 $("retry-load").addEventListener("click", boot);
+const headerObserver = new ResizeObserver(([entry]) => {
+  document.documentElement.style.setProperty("--event-header-height", `${entry.target.getBoundingClientRect().height}px`);
+});
+headerObserver.observe($("event-header"));
 wireEventSwitcher(document);
 boot();
