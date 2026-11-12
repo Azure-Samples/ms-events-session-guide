@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1",
+  "workspaceTable": "AppEvents",
+  "propertiesColumn": "Properties",
+  "identity": {
+    "eventId": "Immutable event directory slug",
+    "catalogVersion": "Hash of the event catalog and curated content; join to a versioned catalog export",
+    "sessionId": "Catalog session identity, scoped to eventId",
+    "occurrenceId": "A scheduled or unscheduled occurrence of a session",
+    "actionId": "Random action-scoped UUID; not a visitor, account, or browser-session identity"
+  },
+  "events": {
+    "event_selected": "Source-observed native-link selection intent, not every event page load",
+    "session_opened": "An explicit session-brief action using a current catalog identity",
+    "calendar_export_requested": "The app initiated a nonempty local ICS download; not a confirmed calendar import",
+    "custom_guide_created": "An explicit successful share-link creation; not an autosave or a count of unique guides",
+    "shared_guide_opened": "A valid, event-matched shared snapshot was displayed",
+    "catalog_zero_results": "A completed search/filter interaction returned no matching sessions; raw queries are excluded"
+  },
+  "composition": {
+    "property": "composition",
+    "format": "JSON array of {sessionId, occurrenceId, position}",
+    "maximumPropertyUtf8Bytes": 6000,
+    "partIdentity": ["eventId", "actionId", "partIndex"],
+    "counts": ["partCount", "itemsInPart", "totalItemCount", "knownItemCount", "unknownItemCount"],
+    "ordering": "position is the original zero-based selection order across all parts",
+    "unknownReferences": "Unknown snapshot references are omitted and counted, never sent as arbitrary identifiers",
+    "delivery": "Deduplicate retry rows before checking part completeness. Count actions, not rows."
+  },
+  "excluded": [
+    "Guide titles, summaries and personal notes",
+    "Encoded guide tokens and URLs, query strings, hashes or referrers",
+    "Raw search text",
+    "Email, account, persistent visitor and browser-session identities",
+    "Automatic page, dependency, exception and device-profile telemetry"
+  ],
+  "storagePrivacy": {
+    "resource": "ms-events-guide-privacy",
+    "table": "AppEvents",
+    "effect": "Remove service-derived browser/OS/device/location and visitor/session/operation fields before new rows are stored",
+    "historicalData": "The transformation does not retroactively alter pre-transformation smoke-test records"
+  },
+  "limitations": [
+    "Only client-observed actions are represented; blockers and delivery failures reduce coverage",
+    "Public browser ingestion cannot prove that a sender is a genuine visitor",
+    "Multipart actions can arrive partially; reports must disclose incompleteness",
+    "The SDK sampling rate is 100 percent, but delivery is still best effort",
+    "Do not interpret action counts as unique users, attendance, reservations, or completed calendar imports"
+  ]
+}

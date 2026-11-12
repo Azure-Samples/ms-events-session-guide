@@ -1,0 +1,15 @@
+{{- /*
+  Builds the small fingerprinted event manifest from published bundles.
+  It contains metadata only; session catalogs stay in per-event assets.
+  Returns dict "events" (manifest entries) "resource".
+*/ -}}
+{{- $events := slice -}}
+{{- $ids := slice -}}
+{{- range partialCached "events/published.html" "published" -}}
+  {{- $catalog := partialCached "catalog.html" . .File.ContentBaseName -}}
+  {{- if in $ids $catalog.event.id -}}{{- errorf "Duplicate event ID %q" $catalog.event.id -}}{{- end -}}
+  {{- $ids = $ids | append $catalog.event.id -}}
+  {{- $events = $events | append $catalog.manifestEntry -}}
+{{- end -}}
+{{- $resource := resources.FromString "data/events/manifest.json" (jsonify (dict "version" 1 "events" $events)) | fingerprint "sha256" -}}
+{{- return dict "events" $events "resource" $resource -}}

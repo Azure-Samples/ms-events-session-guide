@@ -1,0 +1,22 @@
+{{- /* Journey entry cards derived from an event's audiences and ordered paths. Context: dict "guide". */ -}}
+{{- $paths := .guide.paths -}}
+{{- range .guide.audiences }}
+{{- $audience := . -}}
+{{- $audiencePaths := where $paths "audience" $audience.id -}}
+{{- $first := index $audiencePaths 0 -}}
+{{- $stops := 0 -}}{{- range $audiencePaths -}}{{- $stops = add $stops (len .steps) -}}{{- end }}
+<a href="#guide" class="journey-entry" data-entry="{{ $audience.id }}">
+  <div class="journey-entry-top"><span class="badge badge-accent">PRE-BUILT GUIDES</span><span class="session-code">{{ upper $first.id }}</span></div>
+  <h2>{{ $audience.label }} <svg class="icon" aria-hidden="true"><use href="#i-arrow-up"></use></svg></h2>
+  <p>{{ $first.name }}. {{ $first.headline }}</p>
+  <span class="journey-sequence">{{ len $audiencePaths }} guide{{ if ne (len $audiencePaths) 1 }}s{{ end }} &middot; {{ $stops }} curated stop{{ if ne $stops 1 }}s{{ end }}</span>
+  <span class="journey-entry-action">Explore {{ lower $audience.label }} guides <span aria-hidden="true">&rarr;</span></span>
+</a>
+{{- end }}
+<a href="#my-guide" class="journey-entry journey-entry-custom" data-entry="custom">
+  <div class="journey-entry-top"><span class="badge">YOUR OWN EDITION</span><span class="session-code">SHARE</span></div>
+  <h2>Build your own <svg class="icon" aria-hidden="true"><use href="#i-route"></use></svg></h2>
+  <p>Your picks. Your order. Your reasons. One guide to share with others.</p>
+  <span class="journey-sequence">Pick &rarr; Order &rarr; Add your why &rarr; Share</span>
+  <span class="journey-entry-action">Create a guide &amp; share a link <span aria-hidden="true">&rarr;</span></span>
+</a>

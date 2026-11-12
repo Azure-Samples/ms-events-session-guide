@@ -1,0 +1,78 @@
+{{- /*
+  Validates an event's guides.json against its normalized instances.
+  Context: dict "guides" (parsed guides.json) "codes" (map session code -> session ID) "where".
+  Returns dict "audiences" [{id,label}] "paths" [original ordered path objects].
+*/ -}}
+{{- $where := .where -}}
+{{- $guides := .guides -}}
+{{- $codes := .codes -}}
+{{- $slug := `^[a-z0-9]+(-[a-z0-9]+)*$` -}}
+{{- if or (not (reflect.IsMap $guides)) (not (reflect.IsSlice (index $guides "audiences"))) (not (reflect.IsSlice (index $guides "paths"))) -}}
+  {{- errorf "%s: guides.json must be an object with audiences and paths arrays" $where -}}
+  {{- $guides = dict "audiences" slice "paths" slice -}}
+{{- end -}}
+{{- $audiences := slice -}}
+{{- $audienceIds := slice -}}
+{{- range $index, $audience := index $guides "audiences" -}}
+  {{- $id := "" -}}{{- $label := "" -}}
+  {{- if reflect.IsMap $audience -}}{{- $id = index $audience "id" -}}{{- $label = index $audience "label" -}}{{- end -}}
+  {{- if or (ne (printf "%T" $id) "string") (not (findRE $slug $id 1)) (gt (len $id) 80) -}}
+    {{- errorf "%s: audiences[%d].id must be a lowercase slug" $where $index -}}
+  {{- else if eq $id "custom" -}}
+    {{- errorf "%s: audience ID %q is reserved for the custom guide entry" $where $id -}}
+  {{- else if in $audienceIds $id -}}
+    {{- errorf "%s: duplicate audience ID %q" $where $id -}}
+  {{- end -}}
+  {{- if or (ne (printf "%T" $label) "string") (not (strings.TrimSpace $label)) -}}
+    {{- errorf "%s: audiences[%d].label must be nonempty text" $where $index -}}
+  {{- end -}}
+  {{- $audienceIds = $audienceIds | append $id -}}
+  {{- $audiences = $audiences | append (dict "id" $id "label" $label) -}}
+{{- end -}}
+{{- if and (not $audiences) (index $guides "paths") -}}{{- errorf "%s: define at least one audience" $where -}}{{- end -}}
+{{- if not (index $guides "paths") -}}{{- errorf "%s: published events need at least one curated guide" $where -}}{{- end -}}
+
+{{- $pathIds := slice -}}
+{{- $pathAudiences := slice -}}
+{{- range $index, $path := index $guides "paths" -}}
+  {{- if not (reflect.IsMap $path) -}}{{- errorf "%s: paths[%d] must be an object" $where $index -}}{{- continue -}}{{- end -}}
+  {{- $label := printf "%s: paths[%d]" $where $index -}}
+  {{- range $field := slice "id" "name" "audience" "label" "headline" "description" "outcome" "fit" -}}
+    {{- $value := index $path $field -}}
+    {{- if or (ne (printf "%T" $value) "string") (not (strings.TrimSpace $value)) -}}
+      {{- errorf "%s.%s must be nonempty text" $label $field -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if in $pathIds $path.id -}}{{- errorf "%s: duplicate guide ID %q" $where $path.id -}}{{- end -}}
+  {{- $pathIds = $pathIds | append $path.id -}}
+  {{- if not (in $audienceIds $path.audience) -}}
+    {{- errorf "%s: guide %q targets unknown audience %q" $where $path.id $path.audience -}}
+  {{- end -}}
+  {{- $pathAudiences = $pathAudiences | append $path.audience -}}
+  {{- $steps := index $path "steps" -}}
+  {{- if or (not (reflect.IsSlice $steps)) (not $steps) -}}
+    {{- errorf "%s: guide %q must have at least one step" $where $path.id -}}{{- continue -}}
+  {{- end -}}
+  {{- $stepCodes := slice -}}
+  {{- range $stepIndex, $step := $steps -}}
+    {{- if not (reflect.IsMap $step) -}}{{- errorf "%s.steps[%d] must be an object" $label $stepIndex -}}{{- continue -}}{{- end -}}
+    {{- range $field := slice "code" "stage" "why" "takeaway" -}}
+      {{- $value := index $step $field -}}
+      {{- if or (ne (printf "%T" $value) "string") (not (strings.TrimSpace $value)) -}}
+        {{- errorf "%s.steps[%d].%s must be nonempty text" $label $stepIndex $field -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if not (index $codes $step.code) -}}
+      {{- errorf "%s: curated guide %q references unknown session code %q" $where $path.id $step.code -}}
+    {{- else if in $stepCodes $step.code -}}
+      {{- errorf "%s: curated guide %q lists session code %q more than once" $where $path.id $step.code -}}
+    {{- end -}}
+    {{- $stepCodes = $stepCodes | append $step.code -}}
+  {{- end -}}
+{{- end -}}
+{{- range $audiences -}}
+  {{- if not (in $pathAudiences .id) -}}
+    {{- errorf "%s: audience %q has no curated guides; add a path or remove the audience" $where .id -}}
+  {{- end -}}
+{{- end -}}
+{{- return dict "audiences" $audiences "paths" (index $guides "paths") -}}

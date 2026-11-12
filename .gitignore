@@ -435,5 +435,5 @@ FodyWeavers.xsd
 /test-results/
 /.playwright-mcp/
 
-# Unused local speaker export; the app uses 2026_ignite_session_catalog.json
+# Unused local speaker export; the app uses per-event bundle catalogs
 /ignite_sessions.json

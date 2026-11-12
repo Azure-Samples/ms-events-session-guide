@@ -1,0 +1,34 @@
+{
+  "audiences": [
+    {
+      "id": "public-sector",
+      "label": "Public sector"
+    }
+  ],
+  "paths": [
+    {
+      "id": "modernize",
+      "name": "Modernize services",
+      "audience": "public-sector",
+      "label": "The modernize services path",
+      "headline": "A fixture headline.",
+      "description": "Fixture description.",
+      "outcome": "Fixture outcome.",
+      "fit": "Fixture readers",
+      "steps": [
+        {
+          "code": "FAB200",
+          "stage": "Modernize",
+          "why": "Fixture reason for FAB200.",
+          "takeaway": "Fixture takeaway for FAB200."
+        },
+        {
+          "code": "FAB100",
+          "stage": "Open",
+          "why": "Fixture reason for FAB100.",
+          "takeaway": "Fixture takeaway for FAB100."
+        }
+      ]
+    }
+  ]
+}

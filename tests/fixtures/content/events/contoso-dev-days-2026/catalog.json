@@ -1,0 +1,220 @@
+[
+  {
+    "sessionId": "S100",
+    "sessionInstanceId": "S100-a",
+    "sessionCode": "DEV100",
+    "title": "Contoso keynote",
+    "description": "<p>Contoso keynote &amp; fixture details.</p>",
+    "speakerNames": "Fixture Speaker",
+    "sessionType": {
+      "displayValue": "Breakout"
+    },
+    "sessionLevel": [
+      {
+        "displayValue": "Intermediate (200)"
+      }
+    ],
+    "topic": [
+      {
+        "displayValue": "Cloud"
+      }
+    ],
+    "deliveryTypes": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "audienceTypes": [
+      {
+        "displayValue": "Developers"
+      }
+    ],
+    "viewingOptions": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "startDateTime": "2026-11-09T14:00:00Z",
+    "endDateTime": "2026-11-09T15:00:00Z",
+    "durationInMinutes": 60,
+    "location": {
+      "displayValue": "Hall A"
+    },
+    "lastUpdate": "2026-11-01T12:00:00Z",
+    "unusedSourceField": "kept in source"
+  },
+  {
+    "sessionId": "S100",
+    "sessionInstanceId": "S100-b",
+    "sessionCode": "DEV100",
+    "title": "Contoso keynote",
+    "description": "<p>Contoso keynote &amp; fixture details.</p>",
+    "speakerNames": "Fixture Speaker",
+    "sessionType": {
+      "displayValue": "Breakout"
+    },
+    "sessionLevel": [
+      {
+        "displayValue": "Intermediate (200)"
+      }
+    ],
+    "topic": [
+      {
+        "displayValue": "Cloud"
+      }
+    ],
+    "deliveryTypes": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "audienceTypes": [
+      {
+        "displayValue": "Developers"
+      }
+    ],
+    "viewingOptions": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "startDateTime": "2026-11-10T14:00:00Z",
+    "endDateTime": "2026-11-10T15:00:00Z",
+    "durationInMinutes": 60,
+    "location": {
+      "displayValue": "Hall A"
+    },
+    "lastUpdate": "2026-11-01T12:00:00Z",
+    "unusedSourceField": "kept in source"
+  },
+  {
+    "sessionId": "S200",
+    "sessionInstanceId": "S200-a",
+    "sessionCode": "DEV200",
+    "title": "Shipping small",
+    "description": "<p>Shipping small &amp; fixture details.</p>",
+    "speakerNames": "Fixture Speaker",
+    "sessionType": {
+      "displayValue": "Breakout"
+    },
+    "sessionLevel": [
+      {
+        "displayValue": "Intermediate (200)"
+      }
+    ],
+    "topic": [
+      {
+        "displayValue": "Apps"
+      }
+    ],
+    "deliveryTypes": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "audienceTypes": [
+      {
+        "displayValue": "Developers"
+      }
+    ],
+    "viewingOptions": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "startDateTime": "2026-11-10T15:30:00Z",
+    "endDateTime": "2026-11-10T16:15:00Z",
+    "durationInMinutes": 45,
+    "location": {
+      "displayValue": "Hall A"
+    },
+    "lastUpdate": "2026-11-01T12:00:00Z",
+    "unusedSourceField": "kept in source"
+  },
+  {
+    "sessionId": "S300",
+    "sessionInstanceId": "S300-a",
+    "sessionCode": "DEV300",
+    "title": "Grants and impact",
+    "description": "<p>Grants and impact &amp; fixture details.</p>",
+    "speakerNames": "Fixture Speaker",
+    "sessionType": {
+      "displayValue": "Breakout"
+    },
+    "sessionLevel": [
+      {
+        "displayValue": "Intermediate (200)"
+      }
+    ],
+    "topic": [
+      {
+        "displayValue": "Nonprofit"
+      }
+    ],
+    "deliveryTypes": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "audienceTypes": [
+      {
+        "displayValue": "Developers"
+      }
+    ],
+    "viewingOptions": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "startDateTime": "2026-11-13T16:00:00Z",
+    "endDateTime": "2026-11-13T17:00:00Z",
+    "durationInMinutes": 60,
+    "location": {
+      "displayValue": "Hall A"
+    },
+    "lastUpdate": "2026-11-01T12:00:00Z",
+    "unusedSourceField": "kept in source"
+  },
+  {
+    "sessionId": "S400",
+    "sessionInstanceId": "S400-a",
+    "sessionCode": "DEV400",
+    "title": "Unscheduled lab",
+    "description": "<p>Unscheduled lab &amp; fixture details.</p>",
+    "speakerNames": "Fixture Speaker",
+    "sessionType": {
+      "displayValue": "Breakout"
+    },
+    "sessionLevel": [
+      {
+        "displayValue": "Intermediate (200)"
+      }
+    ],
+    "topic": [
+      {
+        "displayValue": "Labs"
+      }
+    ],
+    "deliveryTypes": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "audienceTypes": [
+      {
+        "displayValue": "Developers"
+      }
+    ],
+    "viewingOptions": [
+      {
+        "displayValue": "In-person"
+      }
+    ],
+    "durationInMinutes": 0,
+    "location": {
+      "displayValue": "Hall A"
+    },
+    "lastUpdate": "2026-11-01T12:00:00Z",
+    "unusedSourceField": "kept in source"
+  }
+]

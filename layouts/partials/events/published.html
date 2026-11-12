@@ -1,0 +1,9 @@
+{{- /* Returns the published event bundle pages, ordered by start date then event ID. */ -}}
+{{- $keyed := slice -}}
+{{- range where site.RegularPages "Section" "events" -}}
+  {{- $meta := partialCached "events/metadata.html" . .File.ContentBaseName -}}
+  {{- $keyed = $keyed | append (dict "key" (printf "%s|%s" $meta.startDate $meta.id) "page" .) -}}
+{{- end -}}
+{{- $pages := slice -}}
+{{- range sort $keyed "key" -}}{{- $pages = $pages | append .page -}}{{- end -}}
+{{- return $pages -}}

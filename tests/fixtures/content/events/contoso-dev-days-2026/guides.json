@@ -1,0 +1,62 @@
+{
+  "audiences": [
+    {
+      "id": "startup",
+      "label": "Startup"
+    },
+    {
+      "id": "nonprofit",
+      "label": "Nonprofit"
+    }
+  ],
+  "paths": [
+    {
+      "id": "launch",
+      "name": "Launch fast",
+      "audience": "startup",
+      "label": "The launch fast path",
+      "headline": "A fixture headline.",
+      "description": "Fixture description.",
+      "outcome": "Fixture outcome.",
+      "fit": "Fixture readers",
+      "steps": [
+        {
+          "code": "DEV100",
+          "stage": "Start",
+          "why": "Fixture reason for DEV100.",
+          "takeaway": "Fixture takeaway for DEV100."
+        },
+        {
+          "code": "DEV200",
+          "stage": "Ship",
+          "why": "Fixture reason for DEV200.",
+          "takeaway": "Fixture takeaway for DEV200."
+        },
+        {
+          "code": "DEV300",
+          "stage": "Sustain",
+          "why": "Fixture reason for DEV300.",
+          "takeaway": "Fixture takeaway for DEV300."
+        }
+      ]
+    },
+    {
+      "id": "impact",
+      "name": "Impact first",
+      "audience": "nonprofit",
+      "label": "The impact first path",
+      "headline": "A fixture headline.",
+      "description": "Fixture description.",
+      "outcome": "Fixture outcome.",
+      "fit": "Fixture readers",
+      "steps": [
+        {
+          "code": "DEV300",
+          "stage": "Fund",
+          "why": "Fixture reason for DEV300.",
+          "takeaway": "Fixture takeaway for DEV300."
+        }
+      ]
+    }
+  ]
+}

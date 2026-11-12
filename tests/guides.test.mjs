@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { deflateSync } from "node:zlib";
 import {
-  GUIDE_LIMITS, snapshotSession, validateGuide, encodeGuide, decodeGuide, createShareURL,
+  GUIDE_LIMITS, snapshotSession, validateGuide, getGuideEventId, encodeGuide, decodeGuide, createShareURL,
 } from "../assets/js/guides.js";
 
 function session(overrides = {}) {
@@ -173,7 +173,7 @@ test("rejects malformed guide and step structures with UI-safe errors", () => {
   ]) {
     assert.throws(() => validateGuide(input), Error);
   }
-  for (const version of [undefined, null, "1", 0, 2]) {
+  for (const version of [undefined, null, "1", 0, 3]) {
     assert.throws(() => validateGuide(guide({ version })), /unsupported guide version/i);
   }
 });
@@ -281,7 +281,7 @@ test("rejects malformed token formats, noncanonical base64url, and unsupported v
   for (const token of ["", "1", "1.", "1.abc=", "1.a+b", "1.a/b", "1.a.b", " 1.abc", "1.abc\n"]) {
     await assert.rejects(decodeGuide(token), /invalid token format/i);
   }
-  for (const token of ["2.eJw", "01.eJw", "999.eJw"]) {
+  for (const token of ["3.eJw", "01.eJw", "999.eJw"]) {
     await assert.rejects(decodeGuide(token), /unsupported version/i);
   }
   for (const token of ["1.a", "1.Zh", "1.Zm9"]) {
@@ -309,11 +309,51 @@ test("validates decompressed shape and version instead of trusting compressed JS
   for (const value of [null, [], "guide", guide({ steps: {} }), guide({ summary: 123 })]) {
     await assert.rejects(decodeGuide(rawToken(value)), Error);
   }
-  await assert.rejects(decodeGuide(rawToken(guide({ version: 2 }))), /unsupported guide version/i);
+  await assert.rejects(decodeGuide(rawToken(guide({ version: 3 }))), /unsupported guide version/i);
   await assert.rejects(decodeGuide(rawToken(guide({ steps: distinctSteps(21) }))), /at most 20/i);
   await assert.rejects(decodeGuide(rawToken(guide({
     steps: [{ session: session(), note: "" }, { session: session({ id: "other-instance" }), note: "" }],
   }))), /same session/i);
+});
+
+test("v1 retains its exact shape and identifies Ignite; v2 carries a validated event", async () => {
+  const legacy = guide();
+  assert.equal(getGuideEventId(legacy), "ignite-2026");
+  assert.deepEqual(await decodeGuide(await encodeGuide(legacy)), validateGuide(legacy));
+  const input = guide({ version: 2, eventId: "build-2027" });
+  const expected = validateGuide(input);
+  const token = await encodeGuide(input);
+  assert.match(token, /^2\./);
+  assert.equal(getGuideEventId(await decodeGuide(token)), "build-2027");
+  assert.deepEqual(await decodeGuide(token), expected);
+  assert.ok(Object.isFrozen(expected.steps[0].session));
+  assert.deepEqual(Object.keys(expected), ["version", "eventId", "title", "summary", "steps"]);
+  const shared = await createShareURL("https://example.test/events/build-2027/", input);
+  assert.equal(getGuideEventId(await decodeGuide(new URL(shared).searchParams.get("guide"))), "build-2027");
+});
+
+test("v2 rejects invalid identities and mismatched token/payload versions", async () => {
+  for (const eventId of [undefined, "", "a".repeat(81), "Build-2027", "a:b", "../a",
+    "https://example.com", "a--b", "a\n", null]) {
+    assert.throws(() => validateGuide(guide({ version: 2, eventId })), /event id/i);
+  }
+  assert.throws(() => getGuideEventId(guide({ version: 2, eventId: "https://example.com" })), /event id/i);
+  const token = await encodeGuide(guide({ version: 2, eventId: "foreign-event" }));
+  await assert.rejects(decodeGuide(`1.${token.slice(2)}`), /mismatched version/i);
+  await assert.rejects(decodeGuide(`2.${rawToken(guide()).slice(2)}`), /mismatched version/i);
+});
+
+test("v2 shares enforce creation URL and decompression bounds", async () => {
+  const input = guide({ version: 2, eventId: "build-2027" });
+  const token = await encodeGuide(input);
+  const origin = "https://example.test/";
+  const suffix = `?guide=${token}#my-guide`;
+  const base = origin + "a".repeat(GUIDE_LIMITS.url - origin.length - suffix.length);
+  assert.equal((await createShareURL(base, input)).length, GUIDE_LIMITS.url);
+  await assert.rejects(createShareURL(`${base}a`, input), /too long/i);
+  const large = { ...input, ignoredPadding: "x".repeat(256 * 1024) };
+  await assert.rejects(decodeGuide(`2.${rawToken(large).slice(2)}`), /256 KB safety limit/i);
+  await assert.rejects(decodeGuide(`2.${rawToken({ ...input, eventId: "https://evil.test" }).slice(2)}`), /event id/i);
 });
 
 test("bounds streamed decompression at 256 KB, even for highly compressed ignored fields", async () => {
@@ -372,6 +412,10 @@ test("checks the full serialized URL length, allowing the exact 7500-character b
   const base = origin + "a".repeat(GUIDE_LIMITS.url - origin.length - suffix.length);
   assert.equal((await createShareURL(base, input)).length, GUIDE_LIMITS.url);
   await assert.rejects(createShareURL(`${base}a`, input), /too long.*shorten notes or use fewer sessions/i);
+  const legacy = new URL(await createShareURL(base, input));
+  legacy.pathname += "/events/ignite-2026/";
+  assert.ok(legacy.href.length > GUIDE_LIMITS.url);
+  assert.deepEqual(await decodeGuide(legacy.searchParams.get("guide")), validateGuide(input));
 });
 
 test("rejects invalid, non-web, and credential-bearing base URLs", async () => {

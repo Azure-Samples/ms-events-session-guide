@@ -1,0 +1,25 @@
+{{- /*
+  Checks identities within one event (they may repeat across events).
+  Context: dict "instances" "where". Returns map of session code -> session ID.
+*/ -}}
+{{- $where := .where -}}
+{{- $scratch := newScratch -}}
+{{- range .instances -}}
+  {{- if $scratch.Get (printf "instance:%s" .id) -}}
+    {{- errorf "%s: duplicate session instance ID %q" $where .id -}}
+  {{- end -}}
+  {{- $scratch.Set (printf "instance:%s" .id) true -}}
+  {{- $knownCode := $scratch.Get (printf "session:%s" .sessionId) -}}
+  {{- $knownSession := $scratch.Get (printf "code:%s" .code) -}}
+  {{- if and $knownCode (ne $knownCode .code) -}}
+    {{- errorf "%s: session ID %q appears with codes %q and %q" $where .sessionId $knownCode .code -}}
+  {{- end -}}
+  {{- if and $knownSession (ne $knownSession .sessionId) -}}
+    {{- errorf "%s: session code %q is used by different session IDs %q and %q" $where .code $knownSession .sessionId -}}
+  {{- end -}}
+  {{- $scratch.Set (printf "session:%s" .sessionId) .code -}}
+  {{- $scratch.Set (printf "code:%s" .code) .sessionId -}}
+  {{- $scratch.SetInMap "codes" .code .sessionId -}}
+{{- end -}}
+{{- if not .instances -}}{{- errorf "%s: the catalog has no sessions" $where -}}{{- end -}}
+{{- return $scratch.Get "codes" | default dict -}}

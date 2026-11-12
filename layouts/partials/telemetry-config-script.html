@@ -1,0 +1,4 @@
+{{- /* Emits the telemetry configuration as inert, HTML-escaped JSON when enabled. Context: telemetry state. */ -}}
+{{- if .enabled }}
+<script type="application/json" id="telemetry-config">{{ .config }}</script>
+{{- end }}

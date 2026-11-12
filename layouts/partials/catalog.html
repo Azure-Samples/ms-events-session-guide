@@ -1,49 +1,44 @@
-{{- $source := os.ReadFile site.Params.catalogFile | transform.Unmarshal -}}
-{{- $instances := slice -}}
-{{- $updated := "" -}}
-{{- range $source -}}
-  {{- if or (not .sessionId) (not .sessionInstanceId) (not .sessionCode) (not .title) -}}
-    {{- errorf "Catalog record is missing a session ID, instance ID, code, or title" -}}
-  {{- end -}}
-  {{- $topics := slice -}}
-  {{- range .topic -}}{{- $topics = $topics | append .displayValue -}}{{- end -}}
-  {{- $delivery := slice -}}
-  {{- range .deliveryTypes -}}{{- $delivery = $delivery | append .displayValue -}}{{- end -}}
-  {{- $audiences := slice -}}
-  {{- range .audienceTypes -}}{{- $audiences = $audiences | append .displayValue -}}{{- end -}}
-  {{- $viewing := slice -}}
-  {{- range .viewingOptions -}}{{- $viewing = $viewing | append .displayValue -}}{{- end -}}
-  {{- $level := "" -}}
-  {{- with .sessionLevel -}}{{- $level = (index . 0).displayValue -}}{{- end -}}
-  {{- $location := "" -}}
-  {{- with .location -}}{{- $location = .displayValue -}}{{- end -}}
-  {{- $description := .description | htmlUnescape | plainify | htmlUnescape -}}
-  {{- $instances = $instances | append (dict
-    "id" .sessionInstanceId
-    "sessionId" .sessionId
-    "code" .sessionCode
-    "title" .title
-    "description" $description
-    "speakers" (.speakerNames | default "")
-    "type" (.sessionType.displayValue | default "Session")
-    "level" $level
-    "topics" $topics
-    "delivery" $delivery
-    "audiences" $audiences
-    "viewing" $viewing
-    "start" (.startDateTime | default "")
-    "end" (.endDateTime | default "")
-    "duration" (.durationInMinutes | default 0)
-    "location" $location
-  ) -}}
-  {{- if gt (.lastUpdate | default "") $updated -}}{{- $updated = .lastUpdate -}}{{- end -}}
-{{- end -}}
-{{- range hugo.Data.guide.paths -}}
-  {{- range .steps -}}
-    {{- if not (where $instances "code" .code) -}}
-      {{- errorf "Curated path references unknown session code %s" .code -}}
+{{- /*
+  Normalizes and validates one event bundle's resources (catalog.json and
+  guides.json) into the payload the event guide loads at runtime.
+  Context: the event bundle page. Use partialCached keyed by the event ID.
+  Raw bundle resources are read as content only: never request their
+  permalinks, which would publish the source files.
+  Returns dict "event" (payload metadata) "manifestEntry" "resource" (fingerprinted).
+*/ -}}
+{{- $page := . -}}
+{{- $meta := partialCached "events/metadata.html" $page $page.File.ContentBaseName -}}
+{{- $where := printf "content/events/%s" $meta.id -}}
+
+{{- $read := dict -}}
+{{- range $name := slice "catalog.json" "guides.json" -}}
+  {{- with $page.Resources.Get $name -}}
+    {{- with try (transform.Unmarshal .Content) -}}
+      {{- if .Err -}}{{- errorf "%s/%s is not valid JSON: %s" $where $name .Err -}}{{- else -}}{{- $read = merge $read (dict $name .Value) -}}{{- end -}}
     {{- end -}}
+  {{- else -}}
+    {{- errorf "%s/%s is missing" $where $name -}}
   {{- end -}}
 {{- end -}}
-{{- $payload := dict "instances" $instances "guide" hugo.Data.guide "updated" $updated -}}
-{{- return (resources.FromString "data/catalog.json" ($payload | jsonify) | fingerprint "sha256") -}}
+
+{{- $normalized := partial (printf "events/format-%s.html" $meta.catalogFormat) (dict "source" (index $read "catalog.json") "where" (printf "%s/catalog.json" $where)) -}}
+{{- $codes := partial "events/instances.html" (dict "instances" $normalized.instances "where" (printf "%s/catalog.json" $where)) -}}
+{{- $guide := partial "events/guides.html" (dict "guides" (index $read "guides.json") "codes" $codes "where" (printf "%s/guides.json" $where)) -}}
+
+{{- $content := dict "instances" $normalized.instances "guide" $guide "updated" $normalized.updated -}}
+{{- $catalogVersion := substr (jsonify $content | sha256) 0 16 -}}
+{{- $event := dict
+  "id" $meta.id
+  "name" $meta.name
+  "summary" $meta.summary
+  "startDate" $meta.startDate
+  "endDate" $meta.endDate
+  "timeZone" $meta.timeZone
+  "catalogUrl" $meta.catalogUrl
+  "url" $meta.url
+  "catalogVersion" $catalogVersion
+-}}
+{{- $payload := merge $content (dict "event" $event) -}}
+{{- $resource := resources.FromString (printf "data/events/%s/catalog.json" $meta.id) (jsonify $payload) | fingerprint "sha256" -}}
+{{- $manifestEntry := merge $event (dict "catalogAssetUrl" $resource.RelPermalink "keywords" $meta.keywords) -}}
+{{- return dict "event" $event "meta" $meta "manifestEntry" $manifestEntry "resource" $resource "guide" $guide -}}

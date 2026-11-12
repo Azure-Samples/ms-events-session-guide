@@ -1,0 +1,13 @@
+{{- /* Shared document head. Context: dict "page" "title" "description" "preload" (slice of URLs). */ -}}
+<meta charset="utf-8">
+{{ partial "theme.html" . }}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="{{ .description }}">
+<title>{{ .title }}</title>
+{{ $styles := resources.Get "css/main.css" | minify | fingerprint "sha256" -}}
+<link rel="stylesheet" href="{{ $styles.RelPermalink }}" integrity="{{ $styles.Data.Integrity }}">
+{{ range .preload -}}
+<link rel="preload" href="{{ . }}" as="fetch" crossorigin>
+{{ end -}}
+<link rel="icon" href="{{ "favicon.svg" | relURL }}" type="image/svg+xml">
