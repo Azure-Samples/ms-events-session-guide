@@ -41,7 +41,7 @@
     "historicalData": "The transformation does not retroactively alter pre-transformation smoke-test records"
   },
   "limitations": [
-    "Only permitted, client-observed actions are represented; consent and blockers reduce coverage",
+    "Only client-observed actions are represented; blockers and delivery failures reduce coverage",
     "Public browser ingestion cannot prove that a sender is a genuine visitor",
     "Multipart actions can arrive partially; reports must disclose incompleteness",
     "The SDK sampling rate is 100 percent, but delivery is still best effort",

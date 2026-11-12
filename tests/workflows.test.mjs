@@ -51,6 +51,11 @@ test("Pages telemetry configuration is restricted to main deployment builds", as
     assert.ok(deployment.includes(`vars.HUGO_TELEMETRY_${setting}`));
   }
   assert.ok(deployment.includes("HUGO_TELEMETRY_ENV: production"));
-  assert.ok(deployment.includes("HUGO_TELEMETRY_CONSENT_MODE: wcp"));
+  assert.ok(deployment.includes("HUGO_TELEMETRY_ENABLED: ${{ vars.HUGO_TELEMETRY_ENABLED || 'true' }}"));
   assert.ok(deployment.includes("HUGO_TELEMETRY_BUILD_ID: ${{ github.sha }}"));
+  assert.doesNotMatch(source, /CONSENT_MODE|PRODUCTION_APPROVED|consentMode|wcp/i);
+  assert.equal((source.match(/vars\.HUGO_TELEMETRY_ENABLED/g) || []).length, 1);
+  for (const match of source.matchAll(/vars\.HUGO_TELEMETRY_[A-Z_]+/g)) {
+    assert.ok(deployment.includes(match[0]), `${match[0]} must be restricted to the main deployment`);
+  }
 });

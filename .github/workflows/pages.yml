@@ -75,9 +75,8 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           HUGO_ENVIRONMENT: production
-          HUGO_TELEMETRY_ENABLED: ${{ vars.HUGO_TELEMETRY_ENABLED || 'false' }}
+          HUGO_TELEMETRY_ENABLED: ${{ vars.HUGO_TELEMETRY_ENABLED || 'true' }}
           HUGO_TELEMETRY_ENV: production
-          HUGO_TELEMETRY_CONSENT_MODE: wcp
           HUGO_TELEMETRY_CONNECTION_STRING: ${{ vars.HUGO_TELEMETRY_CONNECTION_STRING }}
           HUGO_TELEMETRY_ORIGIN: ${{ vars.HUGO_TELEMETRY_ORIGIN }}
           HUGO_TELEMETRY_BUILD_ID: ${{ github.sha }}

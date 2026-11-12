@@ -147,8 +147,6 @@ async function main() {
     telemetry = initializeTelemetry({ events: manifest.events });
   } catch (error) {
     telemetry = undefined;
-    const status = $("telemetry-status");
-    if (status) status.textContent = "Optional analytics unavailable. Event discovery still works.";
     console.warn("Optional analytics could not initialize.", error.name);
   }
 }

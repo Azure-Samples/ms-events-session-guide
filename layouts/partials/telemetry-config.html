@@ -53,12 +53,8 @@
   {{- if and $explicitOrigin (not (in (slice "" "/") $url.Path)) -}}
     {{- errorf "HUGO_TELEMETRY_ORIGIN must be an origin, without a path" -}}
   {{- end -}}
-  {{- $mode := os.Getenv "HUGO_TELEMETRY_CONSENT_MODE" | default "wcp" -}}
-  {{- if or (not (in (slice "wcp" "test") $mode)) (and (eq $mode "test") (ne $environment "test")) -}}
-    {{- errorf "Test consent is available only with HUGO_TELEMETRY_ENV=test" -}}
-  {{- end -}}
   {{- $buildId := os.Getenv "HUGO_TELEMETRY_BUILD_ID" | default "local" -}}
   {{- if not (findRE `^[A-Za-z0-9._:-]{1,100}$` $buildId) -}}{{- errorf "Invalid telemetry build ID" -}}{{- end -}}
-  {{- $config = dict "enabled" true "connectionString" $connection "environment" $environment "origin" $origin "buildId" $buildId "consentMode" $mode -}}
+  {{- $config = dict "enabled" true "connectionString" $connection "environment" $environment "origin" $origin "buildId" $buildId -}}
 {{- end -}}
 {{- return (dict "enabled" $enabled "config" $config) -}}

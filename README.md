@@ -26,7 +26,7 @@ npm run dev
 
 Open **http://localhost:1313/**. Use `npm run build` to generate the site and `npm test` to run the tests.
 
-Optional analytics is disabled by default and consent-gated when enabled; see [PRIVACY](PRIVACY).
+The hosted app collects usage telemetry automatically; [run locally](#run-locally) without telemetry. See [PRIVACY](PRIVACY).
 
 ## Maintainer reference
 

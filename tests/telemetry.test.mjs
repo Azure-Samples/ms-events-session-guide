@@ -12,14 +12,12 @@ import {
   parseTelemetryConnectionString, COMPOSITION_BYTES, STARTUP_LIMITS,
 } from "../assets/js/telemetry.js";
 import { createTelemetrySDK, createTelemetryTransport, sanitizeTelemetryEnvelope } from "../assets/js/telemetry-sdk.js";
-import { createWcpConsentProvider } from "../assets/js/telemetry-consent.js";
-import { createTestConsentProvider } from "../assets/js/telemetry-test-consent.js";
 
 const KEY = "11111111-2222-4333-8444-555555555555";
 const ORIGIN = "https://guide.example";
 const CONNECTION = `InstrumentationKey=${KEY};IngestionEndpoint=https://westus2-1.in.applicationinsights.azure.com/;LiveEndpoint=https://westus2.livediagnostics.monitor.azure.com/;ApplicationId=${KEY}`;
 const config = (overrides = {}) => ({ enabled: true, connectionString: CONNECTION, origin: ORIGIN,
-  environment: "test", buildId: "test-build", consentMode: "test", ...overrides });
+  environment: "test", buildId: "test-build", ...overrides });
 const events = [{ id: "ignite-2026" }, { id: "build-2026" }];
 const settle = async () => { for (let index = 0; index < 8; index += 1) await Promise.resolve(); };
 const deferred = () => {
@@ -46,12 +44,6 @@ class Target {
   removeEventListener(name, callback) { this.listeners.get(name)?.delete(callback); }
   emit(name, event = {}) { this.listeners.get(name)?.forEach((callback) => callback(event)); }
 }
-class Element extends Target {
-  constructor(tag = "div") { super(); this.tagName = tag.toUpperCase(); this.children = []; this.textContent = ""; }
-  append(item) { this.children.push(item); item.parent = this; }
-  remove() { if (this.parent) this.parent.children = this.parent.children.filter((item) => item !== this); }
-  focus() { this.focused = true; }
-}
 function clock() {
   let time = 0;
   let id = 0;
@@ -69,37 +61,25 @@ function clock() {
     get pending() { return timers.size; },
   };
 }
-function consent(initial = null) {
-  let value = initial;
-  const subscribers = new Set();
-  return {
-    getConsent: () => value,
-    subscribe(callback) { subscribers.add(callback); return () => subscribers.delete(callback); },
-    choose(next) { value = next; subscribers.forEach((callback) => callback(next)); },
-    setSilently(next) { value = next; },
-    openPrivacySettings: () => true,
-  };
-}
 function browser() {
   const document = new Target();
-  const elements = new Map(["cookie-banner", "privacy-settings", "telemetry-status"].map((id) => [id, new Element()]));
-  document.getElementById = (id) => elements.get(id);
-  document.createElement = (tag) => new Element(tag);
-  document.head = new Element("head");
+  const accesses = [];
+  function forbidden(name) { accesses.push(name); throw new Error(`Unexpected telemetry access: ${name}`); }
+  document.getElementById = (id) => id === "telemetry-config" ? null : forbidden(id);
+  document.createElement = () => forbidden("createElement");
+  Object.defineProperty(document, "cookie", { get: () => forbidden("cookie"), set: () => forbidden("cookie") });
   document.visibilityState = "visible";
-  const storage = new Map();
   const window = new Target();
   window.document = document;
   window.location = { origin: ORIGIN };
-  window.localStorage = { getItem: (key) => storage.get(key) ?? null,
-    setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) };
-  return { window, document, storage, elements };
+  for (const name of ["localStorage", "sessionStorage", "WcpConsent", "BroadcastChannel"]) {
+    Object.defineProperty(window, name, { get: () => forbidden(name) });
+  }
+  return { window, document, accesses };
 }
-function harness(t, { initial = true, catalog = catalogOf(), factory, settings, channel, consentStart } = {}) {
+function harness(t, { catalog = catalogOf(), factory, settings } = {}) {
   const dom = browser();
   const time = clock();
-  const provider = consent(initial);
-  if (consentStart) provider.start = consentStart;
   const diagnostics = [];
   const instances = [];
   function fakeFactory(context) {
@@ -110,11 +90,11 @@ function harness(t, { initial = true, catalog = catalogOf(), factory, settings, 
     return factory ? factory(sdk, context) : sdk;
   }
   const runtime = initializeTelemetry({ events, catalog, config: config(settings),
-    consentProvider: provider, sdkFactory: fakeFactory,
+    sdkFactory: fakeFactory,
     platform: { ...dom, ...time, now: time.now, setTimeout: time.setTimeout, clearTimeout: time.clearTimeout,
-      randomUUID, console: { warn: (code) => diagnostics.push(code) }, BroadcastChannel: channel } });
-  t.after(() => runtime.dispose());
-  return { ...dom, runtime, provider, instances, catalog, time, diagnostics };
+      randomUUID, console: { warn: (code) => diagnostics.push(code) } } });
+  t.after(() => { runtime.dispose(); assert.deepEqual(dom.accesses, []); });
+  return { ...dom, runtime, instances, catalog, time, diagnostics };
 }
 function selection(runtime, eventId = events[0].id) {
   return runtime.track("event_selected", { eventId, source: "directory", title: "NEVER title" });
@@ -132,7 +112,7 @@ test("strict configuration validates resource endpoints, keys, environment and e
   const bad = [
     { environment: "prod" }, { buildId: "has space" }, { origin: "https://other.example" },
     { origin: `${ORIGIN}/path` }, { origin: "http://guide.example" },
-    { environment: "production", consentMode: "test" }, { connectionString: "" },
+    { connectionString: "" },
     { connectionString: CONNECTION.replace(KEY, "not-a-guid") },
     { connectionString: CONNECTION.replace("westus2-1.in.applicationinsights.azure.com", "collector.example") },
     { connectionString: `${CONNECTION};InstrumentationKey=${KEY}` },
@@ -142,7 +122,8 @@ test("strict configuration validates resource endpoints, keys, environment and e
   ];
   for (const item of bad) assert.throws(() => validateTelemetryConfig(config(item), ORIGIN), JSON.stringify(item));
   assert.equal(validateTelemetryConfig(config({ origin: "http://localhost:1313" }), "http://localhost:1313").enabled, true);
-  assert.throws(() => validateTelemetryConfig(config({ origin: "http://localhost:1313", environment: "production", consentMode: "wcp" }), "http://localhost:1313"));
+  assert.equal(validateTelemetryConfig(config({ environment: "production" }), ORIGIN).enabled, true);
+  assert.throws(() => validateTelemetryConfig(config({ origin: "http://localhost:1313", environment: "production" }), "http://localhost:1313"));
 });
 
 for (const length of [1, 20, 300, 1500]) {
@@ -176,94 +157,58 @@ test("unknown, forged and foreign-event snapshot membership is counted without l
   assert.throws(() => splitTelemetryComposition(unicode.instances, unicode, events[0].id), /composition-item-too-large/);
 });
 
-test("disabled and invalid-config facades never start consent or SDK", async () => {
+test("absent, disabled and invalid configuration never starts SDK or sends preconfiguration actions", async () => {
   let started = 0;
-  for (const settings of [{ enabled: false }, config({ origin: "https://wrong.example" })]) {
-    const runtime = initializeTelemetry({ config: settings, consentProvider: { start() { started += 1; } },
-      sdkFactory() { started += 1; }, platform: browser() });
+  for (const settings of [undefined, { enabled: false }, config({ origin: "https://wrong.example" })]) {
+    const dom = browser();
+    const runtime = initializeTelemetry({ config: settings,
+      sdkFactory() { started += 1; }, platform: { ...dom, console: { warn() {} } } });
     assert.equal(selection(runtime).state, "dropped");
     assert.equal(exportAction(runtime, []).state, "dropped");
-    assert.equal(runtime.openPrivacySettings(), false);
+    assert.equal(runtime.openPrivacySettings, undefined);
     runtime.setCatalog(null);
     runtime.dispose();
+    assert.deepEqual(dom.accesses, []);
   }
   assert.equal(started, 0);
 });
 
-test("production telemetry needs enabled configuration and consent, not a separate release flag", async (t) => {
-  const h = harness(t, { initial: null, settings: { environment: "production", consentMode: "wcp" } });
-  await settle();
-  assert.equal(h.runtime.status, "waiting-for-consent");
-  assert.equal(selection(h.runtime).state, "dropped");
-  assert.equal(h.instances.length, 0);
-  h.provider.choose(true);
-  await settle();
-  assert.equal(h.runtime.status, "ready");
-  assert.equal(selection(h.runtime).state, "submitted");
-  assert.equal(h.instances[0].rows.length, 1);
-  h.provider.choose(false);
-  assert.equal(selection(h.runtime).state, "dropped");
-  assert.equal(h.instances[0].rows.length, 1);
-});
-
-test("unconsented actions never queue or replay; consent allows only later explicit actions", async (t) => {
-  const h = harness(t, { initial: null });
-  assert.equal(selection(h.runtime).state, "dropped");
-  assert.equal(exportAction(h.runtime, h.catalog.instances).state, "dropped");
-  await settle();
-  assert.equal(h.runtime.status, "waiting-for-consent");
-  assert.equal(h.elements.get("telemetry-status").textContent, "Optional analytics off until consent is available.");
-  assert.equal(h.instances.length, 0);
-  h.provider.choose(false);
-  h.provider.choose(true);
-  await settle();
-  assert.equal(h.runtime.status, "ready");
-  assert.equal(h.instances[0].rows.length, 0);
-  assert.equal(selection(h.runtime).state, "submitted");
-  assert.equal(h.instances[0].rows.length, 1);
-});
-
-test("normal unselected consent stays waiting while actual consent startup failure is unavailable", async (t) => {
-  const waiting = harness(t, { initial: null, consentStart: async () => {} });
-  const failed = harness(t, { initial: null, consentStart: async () => { throw new Error("blocked provider"); } });
-  await settle();
-  assert.equal(waiting.runtime.status, "waiting-for-consent");
-  assert.equal(failed.runtime.status, "unavailable");
-  assert.match(failed.elements.get("telemetry-status").textContent, /unavailable/);
-  for (const h of [waiting, failed]) {
-    assert.equal(selection(h.runtime).state, "dropped");
-    assert.equal(exportAction(h.runtime, h.catalog.instances).state, "dropped");
-    assert.equal(h.instances.length, 0);
+test("enabled test and production telemetry starts automatically without consent or storage access", async (t) => {
+  for (const environment of ["production", "test"]) {
+    const h = harness(t, { settings: { environment } });
+    assert.equal(h.runtime.status, "starting");
+    await settle();
+    assert.equal(h.runtime.status, "ready");
+    assert.equal(h.instances.length, 1);
+    assert.equal(h.instances[0].rows.length, 0);
+    assert.equal(h.instances[0].context.canSend(), true);
+    assert.equal(selection(h.runtime).state, "submitted");
+    assert.equal(h.instances[0].rows.length, 1);
+    assert.equal(h.runtime.openPrivacySettings, undefined);
+    assert.deepEqual(h.accesses, []);
   }
 });
 
-test("consent reset waits for choice and invalidates pending/ready generations without replay", async (t) => {
+test("disposal invalidates pending startup and queued actions without restarting", async (t) => {
   const pending = deferred();
-  let first = true;
-  const h = harness(t, { factory(sdk) { if (first) { first = false; return pending.promise; } return sdk; } });
+  const h = harness(t, { factory: () => pending.promise });
   await settle();
+  assert.equal(h.instances[0].context.canSend(), true);
   assert.equal(exportAction(h.runtime, h.catalog.instances).state, "queued");
-  h.provider.choose(null);
-  assert.equal(h.runtime.status, "waiting-for-consent");
+  h.runtime.dispose();
+  assert.equal(h.runtime.status, "disposed");
+  assert.equal(h.instances[0].context.canSend(), false);
   assert.equal(h.time.pending, 0);
   assert.equal(exportAction(h.runtime, h.catalog.instances).state, "dropped");
   pending.resolve(h.instances[0]);
   await settle();
   assert.equal(h.instances[0].disposals, 1);
   assert.equal(h.instances[0].rows.length, 0);
-  h.provider.choose(true);
-  await settle();
-  assert.equal(h.runtime.status, "ready");
-  assert.equal(h.instances[1].rows.length, 0);
-  assert.equal(exportAction(h.runtime, h.catalog.instances).state, "submitted");
-  assert.equal(h.instances[1].rows.length, 1);
-  h.provider.choose(null);
-  assert.equal(h.runtime.status, "waiting-for-consent");
-  assert.equal(h.instances[1].disposals, 1);
+  assert.equal(h.runtime.status, "disposed");
+  assert.equal(h.instances.length, 1);
   assert.equal(selection(h.runtime).state, "dropped");
-  h.provider.choose(true);
-  await settle();
-  assert.equal(h.instances[2].rows.length, 0);
+  h.runtime.dispose();
+  assert.equal(h.instances[0].disposals, 1);
 });
 
 test("named events and property allowlists omit titles, notes, URLs, searches, identities and extra keys", async (t) => {
@@ -344,7 +289,7 @@ test("catalog version comes only from the matching trusted catalog; parent sourc
   }
 });
 
-test("consented startup queue snapshots actual action selection and never queues native navigation", async (t) => {
+test("startup queue snapshots actual action selection and never queues native navigation", async (t) => {
   const pending = deferred();
   const h = harness(t, { factory: () => pending.promise });
   await settle();
@@ -388,6 +333,9 @@ test("startup timeout/expiry invalidates all queued actions and late SDKs", asyn
   exportAction(h.runtime, h.catalog.instances);
   h.time.tick(STARTUP_LIMITS.milliseconds + 1);
   assert.equal(h.runtime.status, "unavailable");
+  assert.equal(h.instances[0].context.canSend(), false);
+  assert.equal(selection(h.runtime).state, "dropped");
+  assert.equal(exportAction(h.runtime, h.catalog.instances).state, "dropped");
   pending.resolve(h.instances[0]);
   await settle();
   assert.equal(h.instances[0].rows.length, 0);
@@ -395,87 +343,57 @@ test("startup timeout/expiry invalidates all queued actions and late SDKs", asyn
   assert.equal(h.time.pending, 0);
 });
 
-test("withdrawal during initialization and reconsent use fresh generations with one live SDK", async (t) => {
+test("pagehide clears pending startup actions and flushes only the current sender", async (t) => {
   const pending = deferred();
-  let first = true;
-  const h = harness(t, { factory(sdk) { if (first) { first = false; return pending.promise; } return sdk; } });
+  const h = harness(t, { factory: () => pending.promise });
   await settle();
-  exportAction(h.runtime, h.catalog.instances);
-  h.provider.choose(false);
-  h.provider.choose(true);
-  await settle();
-  assert.equal(h.instances.length, 2);
+  assert.equal(exportAction(h.runtime, h.catalog.instances).state, "queued");
+  h.window.emit("pagehide");
+  assert.equal(h.instances[0].flushes, 0);
   pending.resolve(h.instances[0]);
   await settle();
-  assert.equal(h.instances[0].disposals, 1);
   assert.equal(h.instances[0].rows.length, 0);
-  assert.equal(h.instances[1].disposals, 0);
   assert.equal(selection(h.runtime).state, "submitted");
-  h.provider.choose(false);
-  assert.equal(h.instances[1].disposals, 1);
+  assert.equal(h.instances[0].flushes, 1);
+  h.window.emit("pagehide");
+  assert.equal(h.instances[0].flushes, 2);
+  h.runtime.dispose();
+  assert.equal(h.instances[0].disposals, 1);
+  assert.equal(h.instances[0].context.canSend(), false);
   assert.equal(selection(h.runtime).state, "dropped");
-  h.provider.choose(true);
-  await settle();
-  assert.equal(h.instances.length, 3);
-  assert.equal(h.instances.filter((sdk) => sdk.disposals === 0).length, 1);
-  assert.equal(h.instances[2].rows.length, 0);
+  h.window.emit("pagehide");
+  assert.equal(h.instances[0].flushes, 2);
 });
 
-test("dispatch and visibility recheck consent; storage and broadcast support withdrawal only", async (t) => {
-  class Channel {
-    static instances = [];
-    constructor() { Channel.instances.push(this); }
-    postMessage(data) { Channel.instances.filter((item) => item !== this).forEach((item) => item.onmessage?.({ data })); }
-    close() { this.closed = true; }
+test("storage, broadcast and visibility events introduce no consent gates or telemetry storage", async (t) => {
+  const h = harness(t);
+  await settle();
+  h.window.emit("storage", { key: "unrelated-setting", newValue: "false" });
+  h.window.emit("message", { data: "deny" });
+  h.document.visibilityState = "hidden";
+  h.document.emit("visibilitychange");
+  assert.equal(h.runtime.status, "ready");
+  assert.equal(selection(h.runtime).state, "submitted");
+  assert.deepEqual(h.accesses, []);
+});
+
+test("synchronous and asynchronous SDK failures drop queued actions without leaking exceptions", async (t) => {
+  for (const factory of [
+    () => { throw new Error("SECRET https://url/?token=secret"); },
+    async () => { throw new Error("SECRET https://url/?token=secret"); },
+  ]) {
+    const h = harness(t, { factory });
+    exportAction(h.runtime, h.catalog.instances);
+    await settle();
+    assert.equal(h.runtime.status, "unavailable");
+    assert.equal(h.instances[0].context.canSend(), false);
+    assert.equal(selection(h.runtime).state, "dropped");
+    assert.equal(exportAction(h.runtime, h.catalog.instances).state, "dropped");
+    assert.equal(h.instances[0].rows.length, 0);
+    assert.equal(h.time.pending, 0);
+    assert.doesNotMatch(JSON.stringify(h.diagnostics), /SECRET|https:|token/);
+    assert.deepEqual(h.accesses, []);
   }
-  const a = harness(t, { channel: Channel });
-  const b = harness(t, { channel: Channel });
-  await settle();
-  a.provider.choose(false);
-  assert.equal(b.runtime.status, "denied");
-  assert.equal(selection(b.runtime).state, "dropped");
-  Channel.instances[0].postMessage("allow");
-  b.document.emit("visibilitychange");
-  assert.equal(selection(b.runtime).state, "dropped", "cross-tab messages and visibility cannot grant");
-  b.provider.choose(true);
-  await settle();
-  assert.equal(selection(b.runtime).state, "submitted");
-  b.provider.setSilently(false);
-  b.document.emit("visibilitychange");
-  assert.equal(b.runtime.status, "denied");
-  b.provider.choose(true);
-  await settle();
-  b.provider.setSilently(false);
-  assert.equal(selection(b.runtime).state, "dropped", "dispatch rechecks even without callback");
-  b.provider.choose(true);
-  await settle();
-  b.window.emit("storage", { key: "ms-events-guide:telemetry-withdrawal", newValue: "nonce" });
-  assert.equal(selection(b.runtime).state, "dropped");
-});
-
-test("unavailable consent/storage/SDK failures never throw into application actions or leak exception content", async (t) => {
-  const h = harness(t, { factory: async () => { throw new Error("SECRET https://url/?token=secret"); } });
-  await settle();
-  assert.equal(h.runtime.status, "unavailable");
-  assert.equal(selection(h.runtime).state, "dropped");
-  assert.doesNotMatch(JSON.stringify(h.diagnostics), /SECRET|https:|token/);
-  h.provider.choose(false);
-  h.provider.choose(true);
-  await settle();
-  assert.equal(h.runtime.status, "unavailable");
-  const broken = harness(t);
-  await settle();
-  broken.window.localStorage.setItem = () => { throw new Error("blocked storage"); };
-  broken.provider.choose(false);
-  assert.equal(broken.runtime.status, "denied");
-  const consentFailure = browser();
-  const failed = initializeTelemetry({ events, config: config(), consentProvider: {
-    subscribe() { throw new Error("SECRET consent failure"); }, getConsent() { throw new Error("SECRET"); },
-  }, sdkFactory: () => { throw new Error("must not start"); }, platform: { ...consentFailure, randomUUID, console: { warn() {} } } });
-  t.after(() => failed.dispose());
-  await settle();
-  assert.equal(failed.status, "unavailable");
-  assert.equal(selection(failed).state, "dropped");
 });
 
 test("source-observed selection fires once per explicit hook; initialization and direct loads emit no fake pageview", async (t) => {
@@ -487,7 +405,7 @@ test("source-observed selection fires once per explicit hook; initialization and
   assert.equal(h.instances[0].rows.length, 2);
   assert.equal(h.instances[0].flushes, 2);
   assert.notEqual(h.instances[0].rows[0].properties.actionId, h.instances[0].rows[1].properties.actionId);
-  h.provider.choose(false);
+  h.runtime.dispose();
   h.window.emit("pagehide");
   assert.equal(h.instances[0].flushes, 2);
   h.runtime.dispose();
@@ -562,7 +480,7 @@ test("actual SDK 1500-occurrence multipart payloads reconstruct completely witho
   assert.deepEqual(parts.flatMap((part) => JSON.parse(part.composition)).map((item) => item.occurrenceId), catalog.instances.map((item) => item.id));
 });
 
-test("SDK network rejection is best-effort and withdrawal prevents later retry initiation", async () => {
+test("SDK network rejection is best-effort and disposal prevents later retry initiation", async () => {
   let allowed = true;
   let requests = 0;
   const diagnostics = [];
@@ -588,7 +506,10 @@ test("SDK network rejection is best-effort and withdrawal prevents later retry i
   } finally { sdk.dispose(); }
 });
 
-test("SDK transport rechecks consent on every retry, scrubs excluded SDK tags and has no sync-XHR fallback", async () => {
+test("SDK transport rechecks canSend on every retry, scrubs excluded SDK tags and has no sync-XHR fallback", async () => {
+  assert.throws(() => createTelemetrySDK({
+    config: validateTelemetryConfig(config(), ORIGIN), canSend: () => false, diagnostic() {}, window: {},
+  }), /telemetry-unavailable/);
   let allowed = true;
   const requests = [];
   const transport = createTelemetryTransport({ config: { endpointUrl: "https://approved.example/v2/track", buildId: "golden" },
@@ -605,7 +526,7 @@ test("SDK transport rechecks consent on every retry, scrubs excluded SDK tags an
   assert.doesNotMatch(requests[0][1].body, /SECRET|not-approved/);
   allowed = false;
   transport.sendPOST(payload, () => {});
-  assert.equal(requests.length, 1, "no new retry request after withdrawal");
+  assert.equal(requests.length, 1, "no new retry request after telemetry stops");
   assert.equal(sanitizeTelemetryEnvelope({ data: { baseType: "PageviewData" } }, "golden"), null);
   transport.close();
   const unsupported = createTelemetrySDK({ config: validateTelemetryConfig(config(), ORIGIN), canSend: () => true,
@@ -615,102 +536,21 @@ test("SDK transport rechecks consent on every retry, scrubs excluded SDK tags an
   unsupported.dispose();
 });
 
-test("WCP uses supported Analytics category and settings API, fails closed for NR/blocked/timeout states", async () => {
-  const dom = browser();
-  let callback;
-  let analytics = false;
-  let managed = 0;
-  const manager = { isConsentRequired: true, getConsentFor(category) { assert.equal(category, "Analytics"); return analytics; },
-    manageConsent() { managed += 1; } };
-  dom.window.WcpConsent = { consentCategories: { Analytics: "Analytics" },
-    init(language, banner, done, onChanged) {
-      assert.equal(language, "en-US");
-      assert.equal(banner, dom.elements.get("cookie-banner"));
-      callback = onChanged;
-      done(undefined, manager);
-    } };
-  const provider = createWcpConsentProvider(dom);
-  const choices = [];
-  provider.subscribe((value) => choices.push(value));
-  await provider.start();
-  assert.equal(provider.getConsent(), false);
-  analytics = true;
-  callback();
-  assert.equal(provider.getConsent(), true);
-  assert.deepEqual(choices, [false, true]);
-  assert.equal(provider.openPrivacySettings(), true);
-  assert.equal(managed, 1);
-  provider.dispose();
-  callback();
-  assert.equal(provider.getConsent(), null);
-  for (const required of [false, undefined]) {
-    dom.window.WcpConsent.init = (_language, _banner, done) => done(undefined, { ...manager, isConsentRequired: required });
-    const nr = createWcpConsentProvider(dom);
-    await assert.rejects(nr.start(), /wcp-unavailable/);
-    assert.equal(nr.getConsent(), null);
-    assert.equal(nr.openPrivacySettings(), false);
-    nr.dispose();
-  }
-  const blockedDom = browser();
-  const blocked = createWcpConsentProvider(blockedDom);
-  const load = blocked.start();
-  const script = blockedDom.document.head.children[0];
-  assert.equal(script.src, "https://wcpstatic.microsoft.com/mscc/lib/v2/wcp-consent.js");
-  assert.equal(script.referrerPolicy, "no-referrer");
-  script.onerror();
-  await assert.rejects(load, /wcp-unavailable/);
-  assert.equal(blocked.getConsent(), null);
-  blocked.dispose();
-  const time = clock();
-  const timed = createWcpConsentProvider({ ...browser(), setTimeout: time.setTimeout, clearTimeout: time.clearTimeout });
-  const timeout = timed.start();
-  time.tick(10001);
-  await assert.rejects(timeout, /wcp-unavailable/);
-  assert.equal(timed.getConsent(), null);
-  timed.dispose();
-});
-
-test("explicit TEST adapter has equal-type Allow/Reject/reset controls, valid stored choice and storage-unavailable fallback", () => {
-  const dom = browser();
-  const provider = createTestConsentProvider(dom);
-  provider.start();
-  const buttons = dom.elements.get("cookie-banner").children.filter((element) => element.tagName === "BUTTON");
-  assert.deepEqual(buttons.map((button) => button.textContent), ["Allow TEST analytics", "Reject TEST analytics", "Reset TEST consent"]);
-  assert.ok(buttons.every((button) => button.type === "button"));
-  assert.equal(provider.getConsent(), null);
-  buttons[0].emit("click");
-  assert.equal(provider.getConsent(), true);
-  const other = createTestConsentProvider(dom);
-  assert.equal(other.getConsent(), true);
-  buttons[1].emit("click");
-  assert.equal(provider.getConsent(), false);
-  buttons[2].emit("click");
-  assert.equal(provider.getConsent(), null);
-  dom.window.localStorage.getItem = () => { throw new Error("storage blocked"); };
-  dom.window.localStorage.setItem = () => { throw new Error("storage blocked"); };
-  buttons[0].emit("click");
-  assert.equal(provider.getConsent(), true);
-  assert.equal(provider.openPrivacySettings(), true);
-  provider.dispose();
-  other.dispose();
-});
-
-test("Hugo telemetry flag/config matrix and tree-shaken disabled/production SDK and consent bundles", async (t) => {
+test("Hugo flag matrix excludes disabled SDK and starts configured production telemetry without consent bundles", async (t) => {
   const root = fileURLToPath(new URL("../", import.meta.url));
   const fixture = `${root}tests/.telemetry-fixture-${process.pid}-${randomUUID()}`;
   await mkdir(`${fixture}/layouts/partials`, { recursive: true });
   await mkdir(`${fixture}/assets/js`, { recursive: true });
   t.after(() => rm(fixture, { recursive: true, force: true }));
   await copyFile(`${root}layouts/partials/telemetry-config.html`, `${fixture}/layouts/partials/telemetry-config.html`);
-  for (const name of ["telemetry.js", "telemetry-sdk.js", "telemetry-consent.js", "telemetry-test-consent.js"]) {
+  for (const name of ["telemetry.js", "telemetry-sdk.js"]) {
     await copyFile(`${root}assets/js/${name}`, `${fixture}/assets/js/${name}`);
   }
   await symlink(`${root}node_modules`, `${fixture}/node_modules`, "dir");
   await writeFile(`${fixture}/hugo.toml`, 'baseURL = "https://guide.example/repo/"\ndisableKinds = ["taxonomy", "term", "RSS", "sitemap"]\n');
   await writeFile(`${fixture}/assets/js/entry.js`, 'import {initializeTelemetry} from "./telemetry.js"; globalThis.guideTelemetry=initializeTelemetry();');
   await writeFile(`${fixture}/layouts/index.html`, `{{ $t := partial "telemetry-config.html" . }}{{ $t.config | jsonify | safeHTML }}
-{{ $test := and $t.enabled (eq $t.config.environment "test") (eq $t.config.consentMode "test") }}
-{{ $js := resources.Get "js/entry.js" | js.Build (dict "targetPath" "guide.js" "minify" true "defines" (dict "__TELEMETRY_ENABLED__" (cond $t.enabled "true" "false") "__TELEMETRY_TEST__" (cond $test "true" "false"))) }}{{ $js.RelPermalink }}`);
+{{ $js := resources.Get "js/entry.js" | js.Build (dict "targetPath" "guide.js" "minify" true "defines" (dict "__TELEMETRY_ENABLED__" (cond $t.enabled "true" "false"))) }}{{ $js.RelPermalink }}`);
   const clean = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("HUGO_TELEMETRY_")));
   function build(env = {}) {
     return spawnSync("hugo", ["--source", fixture, "--destination", `${fixture}/output`, "--noBuildLock"], {
@@ -718,9 +558,10 @@ test("Hugo telemetry flag/config matrix and tree-shaken disabled/production SDK 
     });
   }
   const valid = { HUGO_TELEMETRY_ENABLED: "true", HUGO_TELEMETRY_ENV: "test",
-    HUGO_TELEMETRY_CONNECTION_STRING: CONNECTION, HUGO_TELEMETRY_CONSENT_MODE: "test" };
-  for (const flag of [undefined, "false"]) {
-    const result = build(flag === undefined ? {} : { HUGO_TELEMETRY_ENABLED: flag });
+    HUGO_TELEMETRY_CONNECTION_STRING: CONNECTION };
+  for (const env of [{}, { HUGO_TELEMETRY_ENABLED: "false" },
+    { ...valid, HUGO_TELEMETRY_ENABLED: "false" }]) {
+    const result = build(env);
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const html = await readFile(`${fixture}/output/index.html`, "utf8");
     const js = await readFile(`${fixture}/output/guide.js`, "utf8");
@@ -733,10 +574,8 @@ test("Hugo telemetry flag/config matrix and tree-shaken disabled/production SDK 
     { ...valid, HUGO_TELEMETRY_ENV: "staging" },
     { ...valid, HUGO_TELEMETRY_CONNECTION_STRING: CONNECTION.replace(KEY, "invalid") },
     { ...valid, HUGO_TELEMETRY_CONNECTION_STRING: CONNECTION.replace("westus2-1.in.applicationinsights.azure.com", "arbitrary.example") },
-    { ...valid, HUGO_TELEMETRY_ENV: "production" },
     { ...valid, HUGO_TELEMETRY_ORIGIN: "http://unapproved.example" },
     { ...valid, HUGO_TELEMETRY_ORIGIN: "https://guide.example/path" },
-    { ...valid, HUGO_TELEMETRY_CONSENT_MODE: "fake" },
     { ...valid, HUGO_TELEMETRY_BUILD_ID: "not safe" },
   ]) {
     const result = build(env);
@@ -744,10 +583,16 @@ test("Hugo telemetry flag/config matrix and tree-shaken disabled/production SDK 
   }
   const enabled = build(valid);
   assert.equal(enabled.status, 0, enabled.stdout + enabled.stderr);
-  assert.match(await readFile(`${fixture}/output/guide.js`, "utf8"), /Allow TEST analytics/);
-  const production = build({ ...valid, HUGO_TELEMETRY_ENV: "production", HUGO_TELEMETRY_CONSENT_MODE: "wcp" });
+  const testJS = await readFile(`${fixture}/output/guide.js`, "utf8");
+  assert.match(testJS, /AppInsightsCore/);
+  assert.doesNotMatch(testJS, /wcpstatic|WcpConsent|cookie-banner|privacy-settings|TEST analytics|consentMode|consentProvider|openPrivacySettings/);
+  const production = build({ ...valid, HUGO_TELEMETRY_ENV: "production" });
   assert.equal(production.status, 0, production.stdout + production.stderr);
   const productionJS = await readFile(`${fixture}/output/guide.js`, "utf8");
-  assert.doesNotMatch(productionJS, /Allow TEST analytics|telemetry-test-consent|Reset TEST consent/);
-  assert.match(productionJS, /wcpstatic/);
+  const productionHTML = await readFile(`${fixture}/output/index.html`, "utf8");
+  assert.match(productionHTML, /"enabled":true/);
+  assert.match(productionHTML, /"environment":"production"/);
+  assert.match(productionJS, /AppInsightsCore/);
+  assert.doesNotMatch(productionHTML + productionJS,
+    /wcpstatic|WcpConsent|cookie-banner|privacy-settings|TEST analytics|consentMode|consentProvider|openPrivacySettings|PRODUCTION_APPROVED|__TELEMETRY_TEST__/);
 });

@@ -312,9 +312,6 @@ html:has(dialog[open]) { overflow: hidden; }
 .segmented { flex-wrap: wrap; }
 .footer-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 11px; }
 .footer-actions .text-link { font-size: 11px; }
-.telemetry-status { color: var(--cp-text-muted); }
-.telemetry-status:empty { display: none; }
-.cookie-banner:empty { display: none; }
 @media (max-width: 800px) {
   .event-bar-inner { flex-direction: column; align-items: stretch; gap: 12px; }
   .event-switcher { justify-content: space-between; }
@@ -414,6 +411,6 @@ html:has(dialog[open]) { overflow: hidden; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 @media print {
-  .fixture-banner, .event-bar, .cookie-banner, .site-header, .journey-hero, #guide, #my-guide, #catalog, .about-strip, .site-footer, .agenda-controls, .agenda-empty, .toast, dialog, .agenda-item > .icon-button { display: none !important; }
+  .fixture-banner, .event-bar, .site-header, .journey-hero, #guide, #my-guide, #catalog, .about-strip, .site-footer, .agenda-controls, .agenda-empty, .toast, dialog, .agenda-item > .icon-button { display: none !important; }
   .container { width: 100%; }.section { padding: 0; }#agenda .section-heading > p { display: none; }.agenda-item { break-inside: avoid; }
 }

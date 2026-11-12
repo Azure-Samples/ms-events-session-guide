@@ -15,7 +15,6 @@ const SOURCES = Object.freeze({
 const FACETS = new Set(["search", "q", "topic", "type", "level", "delivery", "day", "path"]);
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
-const WITHDRAWAL_KEY = "ms-events-guide:telemetry-withdrawal";
 const bytes = (value) => new TextEncoder().encode(value).length;
 const count = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1000000;
 
@@ -63,11 +62,8 @@ export function validateTelemetryConfig(config, currentOrigin) {
       (config.environment === "production" && local) || currentOrigin !== approved.origin) {
     throw new Error("unapproved-origin");
   }
-  if (!["wcp", "test"].includes(config.consentMode) ||
-      (config.consentMode === "test" && config.environment !== "test")) throw new Error("invalid-consent-mode");
   return Object.freeze({ ...parseTelemetryConnectionString(config.connectionString),
-    enabled: true, environment: config.environment, buildId: config.buildId, origin: config.origin,
-    consentMode: config.consentMode });
+    enabled: true, environment: config.environment, buildId: config.buildId, origin: config.origin });
 }
 
 export function splitTelemetryComposition(instances, catalog, eventId, maximumBytes = COMPOSITION_BYTES) {
@@ -141,7 +137,7 @@ function disabledFacade(state = "disabled") {
   return Object.freeze({
     track: () => ({ state: "dropped", reason: state }),
     trackComposition: () => ({ state: "dropped", reason: state }),
-    setCatalog() {}, openPrivacySettings: () => false, dispose() {},
+    setCatalog() {}, dispose() {},
     get status() { return state; },
   });
 }
@@ -153,7 +149,7 @@ export function initializeTelemetry(options = {}) {
   return disabledFacade();
 }
 
-function initializeEnabledTelemetry({ events = [], catalog = null, config, sdkFactory, consentProvider, platform = {} }) {
+function initializeEnabledTelemetry({ events = [], catalog = null, config, sdkFactory, platform = {} }) {
   const window = platform.window ?? globalThis.window;
   const document = platform.document ?? window?.document;
   const now = platform.now ?? Date.now;
@@ -162,28 +158,22 @@ function initializeEnabledTelemetry({ events = [], catalog = null, config, sdkFa
   const uuid = platform.randomUUID ?? (() => globalThis.crypto.randomUUID());
   let settings;
   try { settings = validateTelemetryConfig(config ?? readConfig(document), window?.location?.origin); }
-  catch { settings = null; }
+  catch {
+    settings = null;
+    (platform.console ?? globalThis.console)?.warn?.("[telemetry] invalid-configuration");
+  }
   if (!settings?.enabled) {
-    const status = document?.getElementById("telemetry-status");
-    if (status) status.textContent = settings ? "Optional analytics disabled." : "Optional analytics unavailable: configuration error.";
-    const button = document?.getElementById("privacy-settings");
-    if (button) button.disabled = true;
     return disabledFacade(settings ? "disabled" : "configuration-error");
   }
   const eventIds = new Set(events.map((event) => event?.id).filter((id) => typeof id === "string" && IDENTIFIER.test(id)));
-  let state = "waiting-for-consent";
+  let state = "starting";
   let generation = 0;
-  let permitted = false;
   let closed = false;
   let sender = null;
-  let provider = consentProvider;
-  let unsubscribe;
-  let channel;
   let queue = [];
   let queueBytes = 0;
   let queueTimer;
   let startupTimer;
-  const privacyButton = document?.getElementById("privacy-settings");
   const cleanups = [];
   const diagnostics = new Set();
   function diagnostic(code) {
@@ -193,16 +183,6 @@ function initializeEnabledTelemetry({ events = [], catalog = null, config, sdkFa
   }
   function updateStatus(next) {
     state = next;
-    const element = document?.getElementById("telemetry-status");
-    if (element) element.textContent = {
-      "waiting-for-consent": "Optional analytics off until consent is available.",
-      starting: "Optional analytics starting after consent.",
-      ready: "Optional analytics enabled (best-effort delivery).",
-      denied: "Optional analytics off.",
-      unavailable: "Optional analytics unavailable. Your guide still works.",
-      disposed: "Optional analytics off.",
-    }[next];
-    if (privacyButton) privacyButton.disabled = provider?.canOpenPrivacySettings === false || !provider?.openPrivacySettings;
   }
   function clearQueue() {
     queue = [];
@@ -214,45 +194,30 @@ function initializeEnabledTelemetry({ events = [], catalog = null, config, sdkFa
     if (!target) return;
     try { target.dispose(); } catch { diagnostic("sdk-dispose-failed"); }
   }
-  function broadcastWithdrawal() {
-    try { channel?.postMessage("withdraw"); } catch { diagnostic("withdrawal-broadcast-unavailable"); }
-    try { window?.localStorage?.setItem(WITHDRAWAL_KEY, uuid()); } catch { diagnostic("withdrawal-storage-unavailable"); }
-  }
-  function withdraw({ broadcast = false, unavailable = false, waitingForConsent = false } = {}) {
-    permitted = false;
+  function stop(next = "unavailable") {
     generation += 1;
     clearQueue();
     cancel(startupTimer);
     const previous = sender;
     sender = null;
     stopSender(previous);
-    updateStatus(unavailable ? "unavailable" : waitingForConsent ? "waiting-for-consent" : "denied");
-    if (broadcast) broadcastWithdrawal();
+    updateStatus(next);
   }
-  function consentStillValid() {
-    if (closed || !permitted) return false;
-    let value;
-    try { value = provider?.getConsent(); }
-    catch {
-      diagnostic("consent-read-failed");
-      withdraw({ broadcast: true, unavailable: true });
-      return false;
-    }
-    if (value !== true) withdraw({ broadcast: true, waitingForConsent: value == null });
-    return value === true;
+  function active() {
+    return !closed && (state === "starting" || state === "ready");
   }
   function sendAction(action) {
-    if (!sender || action.generation !== generation || !consentStillValid()) return { state: "dropped", reason: "consent-unavailable" };
+    if (!sender || action.generation !== generation || !active()) return { state: "dropped", reason: "telemetry-unavailable" };
     try {
       for (const row of action.rows) {
-        if (!consentStillValid()) return { state: "dropped", reason: "consent-withdrawn" };
+        if (!active()) return { state: "dropped", reason: "telemetry-unavailable" };
         if (sender.track(row.name, row.properties) === false) return { state: "dropped", reason: "transport-unavailable" };
       }
       if (action.navigation) sender.flushNavigation();
       return { state: "submitted" };
     } catch {
       diagnostic("sdk-dispatch-failed");
-      withdraw({ unavailable: true });
+      stop();
       return { state: "dropped", reason: "sdk-unavailable" };
     }
   }
@@ -291,25 +256,25 @@ function initializeEnabledTelemetry({ events = [], catalog = null, config, sdkFa
     throw new Error("sdk-not-compiled");
   }
   async function startSender() {
-    if (closed || !permitted || sender || state === "starting") return;
+    if (!active() || sender) return;
     updateStatus("starting");
     const expected = generation;
     startupTimer = schedule(() => {
       if (generation === expected && state === "starting") {
         diagnostic("sdk-startup-timeout");
-        withdraw({ unavailable: true });
+        stop();
       }
     }, STARTUP_LIMITS.milliseconds);
     try {
       const created = await (sdkFactory ?? defaultFactory)({
-        config: settings, canSend: () => generation === expected && consentStillValid(),
+        config: settings, canSend: () => generation === expected && active(),
         diagnostic, window, document,
       });
       if (!created || !["track", "flushNavigation", "dispose"].every((key) => typeof created[key] === "function")) {
         stopSender(created);
         throw new Error("unsupported-sdk");
       }
-      if (closed || generation !== expected || !consentStillValid()) { stopSender(created); return; }
+      if (generation !== expected || !active()) { stopSender(created); return; }
       cancel(startupTimer);
       sender = created;
       updateStatus("ready");
@@ -320,87 +285,22 @@ function initializeEnabledTelemetry({ events = [], catalog = null, config, sdkFa
     } catch {
       if (closed || generation !== expected) return;
       diagnostic("sdk-startup-failed");
-      withdraw({ unavailable: true });
+      stop();
     }
-  }
-  function onConsent(value) {
-    if (closed) return;
-    if (value !== true) {
-      withdraw({ broadcast: permitted, waitingForConsent: value == null });
-      return;
-    }
-    if (!permitted) {
-      permitted = true;
-      generation += 1;
-      startSender();
-    }
-  }
-  function onVisibility() {
-    if (document?.visibilityState !== "hidden" && permitted) consentStillValid();
   }
   function listen(target, event, handler) {
     target?.addEventListener?.(event, handler);
     cleanups.push(() => target?.removeEventListener?.(event, handler));
   }
-  listen(document, "visibilitychange", onVisibility);
-  listen(window, "storage", (event) => {
-    if (event.key === WITHDRAWAL_KEY && event.newValue) withdraw();
-    else if (permitted) consentStillValid();
-  });
   listen(window, "pagehide", () => {
-    if (consentStillValid()) {
+    if (active()) {
       try { sender?.flushNavigation(); } catch { diagnostic("navigation-flush-failed"); }
     }
     clearQueue();
   });
-  const Channel = platform.BroadcastChannel ?? window?.BroadcastChannel;
-  try {
-    if (Channel) {
-      channel = new Channel("ms-events-guide:telemetry-consent");
-      channel.onmessage = (event) => { if (event.data === "withdraw") withdraw(); };
-    }
-  } catch { diagnostic("withdrawal-channel-unavailable"); }
-  async function startConsent() {
-    try {
-      if (!provider) {
-        if (settings.consentMode === "test") {
-          if (typeof __TELEMETRY_TEST__ !== "undefined" && __TELEMETRY_TEST__) {
-            const { createTestConsentProvider } = await import("./telemetry-test-consent.js");
-            provider = createTestConsentProvider({ window, document });
-          } else throw new Error("test-consent-not-compiled");
-        } else {
-          const { createWcpConsentProvider } = await import("./telemetry-consent.js");
-          provider = createWcpConsentProvider({ window, document });
-        }
-      }
-      if (closed) { provider?.dispose?.(); return; }
-      unsubscribe = provider.subscribe(onConsent);
-      await provider.start?.();
-      if (!closed) onConsent(provider.getConsent());
-    } catch {
-      if (!closed) {
-        diagnostic("consent-startup-failed");
-        withdraw({ unavailable: true });
-      }
-    }
-  }
-  function openPrivacySettings() {
-    if (closed) return false;
-    try {
-      const opened = provider?.openPrivacySettings?.() === true;
-      if (!opened && state !== "ready") updateStatus("unavailable");
-      return opened;
-    } catch {
-      diagnostic("privacy-settings-unavailable");
-      withdraw({ unavailable: true });
-      return false;
-    }
-  }
-  listen(privacyButton, "click", openPrivacySettings);
-  updateStatus(state);
-  startConsent();
+  startSender();
   function capture(name, input, instances) {
-    if (!consentStillValid()) return { state: "dropped", reason: "consent-unavailable" };
+    if (!active()) return { state: "dropped", reason: "telemetry-unavailable" };
     try {
       const actionId = uuid();
       if (!GUID.test(actionId)) throw new Error("uuid-unavailable");
@@ -434,16 +334,11 @@ function initializeEnabledTelemetry({ events = [], catalog = null, config, sdkFa
     track: (name, input = {}) => capture(name, input),
     trackComposition: (name, instances, input = {}) => capture(name, input, instances),
     setCatalog(value) { catalog = value; },
-    openPrivacySettings,
     dispose() {
       if (closed) return;
       closed = true;
-      withdraw();
-      unsubscribe?.();
-      try { provider?.dispose?.(); } catch { diagnostic("consent-dispose-failed"); }
-      channel?.close?.();
+      stop("disposed");
       cleanups.forEach((cleanup) => cleanup());
-      updateStatus("disposed");
     },
     get status() { return state; },
   });

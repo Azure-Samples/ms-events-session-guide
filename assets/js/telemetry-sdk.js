@@ -90,7 +90,7 @@ export function createTelemetryTransport({ config, canSend, diagnostic, window }
 }
 
 export function createTelemetrySDK({ config, canSend, diagnostic, window }) {
-  if (!canSend()) throw new Error("consent-unavailable");
+  if (!canSend()) throw new Error("telemetry-unavailable");
   const core = new AppInsightsCore();
   const sender = new Sender();
   const transport = createTelemetryTransport({ config, canSend, diagnostic, window });

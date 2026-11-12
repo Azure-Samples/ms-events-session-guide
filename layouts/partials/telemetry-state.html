@@ -8,14 +8,9 @@
   {{- $state = partialCached "telemetry-config.html" . "telemetry" -}}
 {{- end -}}
 {{- $enabled := and $state.enabled $state.config -}}
-{{- $testMode := false -}}
-{{- if $enabled -}}
-  {{- $testMode = and (eq (index $state.config "environment") "test") (eq (index $state.config "consentMode") "test") -}}
-{{- end -}}
 {{- return dict
   "enabled" (cond $enabled true false)
   "config" (cond $enabled $state.config nil)
   "defines" (dict
-    "__TELEMETRY_ENABLED__" (cond $enabled "true" "false")
-    "__TELEMETRY_TEST__" (cond $testMode "true" "false"))
+    "__TELEMETRY_ENABLED__" (cond $enabled "true" "false"))
 -}}

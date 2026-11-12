@@ -1,4 +1,4 @@
-Microsoft Events Guide - Privacy and Optional Analytics
+Microsoft Events Guide - Privacy and Usage Analytics
 
 Data Collection. The software may collect information about you and your use
 of the software and send it to Microsoft. Microsoft may use this information
@@ -13,30 +13,29 @@ You can learn more about data collection and use in the help documentation
 and our privacy statement. Your use of the software operates as your consent
 to these practices.
 
-Application analytics is disabled in default local/PR builds. Where enabled,
-required consent is checked before optional collection. Use the deployed
-privacy settings control to refuse or withdraw permission. A deployment
-without configured/available consent does not collect optional actions.
+The hosted app collects usage telemetry automatically, without a permission
+prompt or cookie banner. Default local and PR builds do not collect application
+telemetry. Run a local version to use the app without application analytics.
 
 Usage records are restricted to event/catalog/session identities,
 explicit action type/source/counts, ordered known-session composition,
 schema/build/environment, and random action-scoped identifiers. They do not
 include personal notes, custom titles/summaries, share tokens, URLs/referrers,
 raw search text, account/email identities, or persistent visitor identities.
-The SDK writes no tracking cookies or storage; consent-choice storage and
-local event draft/agenda storage are separate.
+The SDK writes no tracking cookies or storage. Local event draft and agenda
+storage is separate from application analytics.
 
 To produce a telemetry-disabled version, set HUGO_TELEMETRY_ENABLED=false
 when running the documented npm build/dev commands. This excludes the
-analytics SDK, ingestion configuration, and WCP integration from that build.
+analytics SDK and ingestion configuration from that build.
 
 Usage retention is 730 days in the dedicated Azure AppEvents table.
 The approved workspace ingestion transformation removes service-derived
 browser, OS, device/location and visitor/session/operation identifiers before
 new records are stored. It does not retroactively alter earlier smoke-test
 records. Normal network infrastructure still processes request metadata.
-Production collection requires valid deployment configuration and available
-visitor consent through WCP. Verify stored post-transformation rows.
+Production collection requires valid deployment configuration. Verify stored
+post-transformation rows.
 
 Share links contain their snapshots and notes in the query string. Do not
 include private information. Encoding is not encryption. A requested URL

@@ -69,13 +69,13 @@ hugo server --config hugo.toml,tests/fixtures/hugo.toml --bind 127.0.0.1 --port 
 
 Fixture content is not included in an ordinary production build.
 
-## Optional usage analytics
+## Usage analytics
 
 The data-collection notice and user-facing privacy information are in [PRIVACY](../PRIVACY).
 
-When enabled and permitted, explicit custom events measure event selection intents, session-brief opens, calendar-download requests, successful custom-guide share creation and its ordered session composition, shared-guide opens, and zero-result filters. They include event/catalog/session identities, action counts, an ephemeral action ID, environment, and build version. They **do not** include guide titles, summaries, personal notes, share tokens, URLs/referrers, raw search text, account/email IDs, or persistent visitor identities. They are best-effort observed actions, not unique users, reservations, or proof of calendar import.
+The hosted app automatically records explicit custom events for event selection intents, session-brief opens, calendar-download requests, successful custom-guide share creation and its ordered session composition, shared-guide opens, and zero-result filters. They include event/catalog/session identities, action counts, an ephemeral action ID, environment, and build version. They **do not** include guide titles, summaries, personal notes, share tokens, URLs/referrers, raw search text, account/email IDs, or persistent visitor identities. They are best-effort observed actions, not unique users, reservations, or proof of calendar import.
 
-The analytics SDK uses no cookies or persistent/session storage. The separate consent system may store the visitor's choice, and the event app stores drafts/agendas locally. Production uses the standard Microsoft WCP consent integration with a persistent footer privacy control; unknown, blocked, refused, or withdrawn consent prevents new optional collection. Withdrawal clears pending buffers rather than replaying them later.
+The analytics SDK uses no cookies or persistent/session storage. There is no consent provider, banner, or permission prompt. The event app stores drafts and agendas locally, independently of telemetry. Default local runs and PR builds exclude analytics; deployments enable it automatically. Disposing the telemetry runtime discards buffered events and prevents new sends.
 
 To build or run without application analytics:
 
@@ -86,7 +86,7 @@ HUGO_TELEMETRY_ENABLED=false npm run build
 
 Disabling application analytics does not disable GitHub's hosting/access logs, and a requested share URL still reaches its hosting provider.
 
-Explicit analytics builds require `HUGO_TELEMETRY_ENABLED=true`, `HUGO_TELEMETRY_ENV=production` or `test`, `HUGO_TELEMETRY_CONNECTION_STRING`, a matching HTTPS `HUGO_TELEMETRY_ORIGIN`, and an optional bounded `HUGO_TELEMETRY_BUILD_ID`. Production uses WCP consent. A local `test` build may explicitly select `HUGO_TELEMETRY_CONSENT_MODE=test`; its clearly labelled test adapter is excluded from production.
+Explicit analytics builds require `HUGO_TELEMETRY_ENABLED=true`, `HUGO_TELEMETRY_ENV=production` or `test`, `HUGO_TELEMETRY_CONNECTION_STRING`, a matching HTTPS `HUGO_TELEMETRY_ORIGIN`, and an optional bounded `HUGO_TELEMETRY_BUILD_ID`. The runtime starts automatically when that configuration is valid. Invalid configuration, SDK errors, and blocked requests do not prevent use of the app.
 
 Connection strings are public browser ingestion configuration, not query or management credentials. Keep environment-specific values out of source, use deployment-environment variables when publishing later, and never embed workspace shared keys or Azure tokens. Do not give PR builds production configuration.
 
@@ -94,11 +94,11 @@ The Pages workflow reads these repository Actions variables only for deployment 
 
 | Variable | Value |
 |---|---|
-| `HUGO_TELEMETRY_ENABLED` | `true` to include the analytics integration; defaults to `false` |
+| `HUGO_TELEMETRY_ENABLED` | Defaults to `true` in deployment builds; set `false` to disable collection |
 | `HUGO_TELEMETRY_CONNECTION_STRING` | Connection string from your Application Insights resource |
 | `HUGO_TELEMETRY_ORIGIN` | Exact HTTPS origin from the repository's Pages deployment URL, without a path |
 
-The workflow fixes the environment to `production`, uses WCP consent, and tags events with the commit SHA. PR and non-main preview builds explicitly disable telemetry and receive none of these deployment variables. There is no separate release-approval flag; collection depends on the enable switch, valid configuration, and visitor consent. After changing variables, rebuild and deploy `main` to apply them; they are embedded at build time.
+The workflow fixes the environment to `production` and tags events with the commit SHA. PR and non-main preview builds explicitly disable telemetry and receive none of these deployment variables. There is no separate release-approval or visitor-permission gate. After changing variables, rebuild and deploy `main` to apply them; they are embedded at build time.
 
 The optional Azure templates provision Application Insights `ms-events-guide`, linked to dedicated workspace `ms-events-guide-logs`, in your selected subscription and existing resource group. Configure `AppEvents` for **730-day interactive and total retention** after its first ingestion. The workspace cap is disabled (`-1`); Application Insights additionally has an **Azure-default 100 GB/day component limit**. Ingestion and two-year retention are billable.
 
@@ -115,7 +115,7 @@ bash scripts/provision-monitoring.sh create
 # Apply the separately approved pre-storage privacy transformation:
 bash scripts/configure-telemetry-privacy.sh what-if
 bash scripts/configure-telemetry-privacy.sh create
-# After one permitted test event creates AppEvents:
+# After one test event creates AppEvents:
 bash scripts/configure-telemetry-retention.sh
 ```
 
@@ -123,7 +123,7 @@ Read the connection string from the new component's Overview page. Read back wor
 
 Application Insights can derive geolocation, browser and OS from request metadata even when the client payload omits them. The separately approved `ms-events-guide-privacy` workspace transformation removes those fields and visitor/session/operation identities **before storage in AppEvents**. It does not filter out the business events or their session composition. `infra/privacy-transform.json` and `scripts/configure-telemetry-privacy.sh` configure it only on this dedicated workspace; rerunning the core provisioning script preserves that association.
 
-Transformations apply to newly ingested records, not older smoke-test rows. Verify stored post-transformation rows before production activation; a clean client envelope alone is not proof that server enrichment is absent. Default app builds remain telemetry-disabled; enabled builds collect only when configuration and visitor consent permit.
+Transformations apply to newly ingested records, not older smoke-test rows. Verify stored post-transformation rows before production activation; a clean client envelope alone is not proof that server enrichment is absent. Default local builds remain telemetry-disabled; hosted builds collect automatically with valid configuration.
 
 ## Analyze the data
 
@@ -180,11 +180,11 @@ assets/js/guides.js               Validated compressed guide snapshots
 assets/js/app.js                  Browser UI and local persistence
 assets/js/events.js               Event search, dates, validation, legacy routing
 assets/js/event-state.js          Event-scoped storage and legacy migration
-assets/js/telemetry*.js            Consent-aware allowlisted analytics
+assets/js/telemetry*.js            Automatic allowlisted analytics
 analytics/                        Telemetry contract and KQL (dashboard deferred)
 infra/monitoring.json             Scoped workspace/Application Insights template
 tests/                           Native Node tests
 .github/workflows/pages.yml       GitHub Pages build and deployment
 ```
 
-JavaScript is bundled through Hugo/esbuild; assets and normalized catalogs are fingerprinted. Event data is same-origin. A default telemetry-disabled build makes no analytics/WCP calls. An approved analytics-enabled deployment additionally loads Microsoft's consent integration and sends only the permitted custom telemetry to the configured Azure ingestion endpoint.
+JavaScript is bundled through Hugo/esbuild; assets and normalized catalogs are fingerprinted. Event data is same-origin. A default local build makes no analytics calls. A deployment sends only allowlisted custom telemetry to the configured Azure ingestion endpoint, without loading a consent service or showing a banner.
