@@ -139,6 +139,27 @@ test("event destinations preserve query and hash verbatim at root and repository
   assert.throws(() => eventDestination("https://evil.example/", "https://guide.example", "", ""), /site-relative/);
 });
 
+test("event destinations consume only the decoded routing key without re-encoding other parameters", () => {
+  const origin = "https://guide.example";
+  const path = "/repo/events/ignite-2026/";
+  for (const selector of ["event=ignite-2026", "%65vent=ignite-2026"]) {
+    assert.equal(eventDestination(path, origin, `?${selector}`, ""), `${origin}${path}`);
+    const other = "guide=2.AbC_-x&q=caf%C3%A9+ai&topic=AI%20agents&flag&empty=&tag=one&tag=two";
+    for (const query of [
+      `${selector}&${other}`,
+      `guide=2.AbC_-x&${selector}&q=caf%C3%A9+ai&topic=AI%20agents&flag&empty=&tag=one&tag=two`,
+      `${other}&${selector}`,
+    ]) {
+      assert.equal(eventDestination(path, origin, `?${query}`, "#my-guide"),
+        `${origin}${path}?${other}#my-guide`);
+    }
+  }
+  assert.equal(eventDestination(path, origin, "?event=ignite-2026&event=ignite-2026", "#catalog"),
+    `${origin}${path}#catalog`);
+  assert.equal(eventDestination(path, origin, "?q=event%3Dignite-2026&eventual=keep", ""),
+    `${origin}${path}?q=event%3Dignite-2026&eventual=keep`);
+});
+
 function snapshot(overrides = {}) {
   return {
     id: "S100-a", sessionId: "S100", code: "FAB100", title: "Fabrikam opening", description: "",
@@ -154,7 +175,7 @@ const manifestEvents = [
   event({ id: "fabrikam-summit-2027", url: "/repo/events/fabrikam-summit-2027/" }),
 ];
 
-test("event query selects a published event and preserves query and hash verbatim", async () => {
+test("event query selects a published event, consuming the selector and preserving other parameters", async () => {
   for (const prefix of ["", "/repo"]) {
     const events = manifestEvents.map((item) => ({ ...item, url: `${prefix}/events/${item.id}/` }));
     for (const eventId of ["ignite-2026", "fabrikam-summit-2027"]) {
@@ -162,7 +183,7 @@ test("event query selects a published event and preserves query and hash verbati
       const result = await resolveLegacyRoute({ origin: "https://guide.example", search, hash: "#catalog" }, events, helpers);
       assert.equal(result.type, "redirect");
       assert.equal(result.event.id, eventId);
-      assert.equal(result.url, `https://guide.example${prefix}/events/${eventId}/${search}#catalog`);
+      assert.equal(result.url, `https://guide.example${prefix}/events/${eventId}/?q=caf%C3%A9+ai&scoutTheme=dark&audience=nonprofit&tz=UTC#catalog`);
     }
   }
 });
@@ -191,7 +212,7 @@ test("event selectors must agree with validated shared-guide identities", async 
     const search = `?event=${eventId}&guide=${token}&scoutTheme=light`;
     const result = await resolveLegacyRoute({ origin: "https://org.github.io", search, hash: "#my-guide" }, manifestEvents, helpers);
     assert.equal(result.type, "redirect");
-    assert.equal(result.url, `https://org.github.io/repo/events/${eventId}/${search}#my-guide`);
+    assert.equal(result.url, `https://org.github.io/repo/events/${eventId}/?guide=${token}&scoutTheme=light#my-guide`);
     const otherEvent = version === 1 ? "fabrikam-summit-2027" : "ignite-2026";
     const mismatch = await resolveLegacyRoute({
       origin: "https://org.github.io", search: `?event=${otherEvent}&guide=${token}`, hash: "",
@@ -396,7 +417,7 @@ test("fixture build supports two events, reused IDs, novel audiences, and reposi
       const search = `?event=${item.id}`;
       const route = await resolveLegacyRoute({ origin: "https://org.github.io", search, hash: "" }, manifest.events, helpers);
       assert.equal(route.type, "redirect");
-      assert.equal(route.url, `https://org.github.io${item.url}${search}`);
+      assert.equal(route.url, `https://org.github.io${item.url}`);
     }
     const contoso = await readJSON(out, /^data\/events\/contoso-dev-days-2026\/catalog\./);
     const fabrikam = await readJSON(out, /^data\/events\/fabrikam-summit-2027\/catalog\./);

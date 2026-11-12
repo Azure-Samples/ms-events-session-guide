@@ -12,7 +12,7 @@ Drafts and agendas are isolated by event and browser origin. Shared guides are v
 
 ## Event links
 
-Direct event paths such as `/events/ignite-2026/` remain the canonical entry points. A root link with `?event=ignite-2026` opens that published event, preserving the original query parameters and fragment, including filters, theme, and shared-guide tokens. This also works when the site is deployed under a repository subpath.
+Direct event paths such as `/events/ignite-2026/` remain the canonical entry points. A root link with `?event=ignite-2026` opens that published event and consumes the `event` selector, so the resulting URL is `/events/ignite-2026/`, not `/events/ignite-2026/?event=ignite-2026`. Other query parameters and the fragment, including filters, theme, and shared-guide tokens, are preserved without re-encoding. This also works when the site is deployed under a repository subpath.
 
 Every published event must have an `event` parameter mapping: its permanent `params.eventId` maps to its published URL in the generated event manifest. For example, `event=ignite-2026` maps to `/events/ignite-2026/`. New event bundles supply this mapping automatically through their metadata; no separate alias list or JavaScript change is required.
 

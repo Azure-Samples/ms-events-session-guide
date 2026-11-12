@@ -113,11 +113,16 @@ export function legacyRouteKind(search, hash) {
   return null;
 }
 
-// Builds the event URL while carrying the original query and hash verbatim:
-// share tokens are never decoded and re-encoded during navigation.
+// Consume the routing selector without re-encoding other query values or share tokens.
 export function eventDestination(eventUrl, origin, search, hash) {
   const target = new URL(siteRelative(eventUrl, "Event URL"), origin);
-  return `${target.origin}${target.pathname}${search || ""}${hash || ""}`;
+  let query = search || "";
+  if (new URLSearchParams(query).has("event")) {
+    const remaining = query.replace(/^\?/, "").split("&")
+      .filter((part) => !new URLSearchParams(part).has("event")).join("&");
+    query = remaining ? `?${remaining}` : "";
+  }
+  return `${target.origin}${target.pathname}${query}${hash || ""}`;
 }
 
 // Resolves an explicit event selector or a legacy root link. Version-1 guide tokens and
