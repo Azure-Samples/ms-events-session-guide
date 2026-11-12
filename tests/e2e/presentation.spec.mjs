@@ -1,10 +1,13 @@
 import { test, expect } from "./helpers.mjs";
 
+test.use({ contextOptions: { reducedMotion: "no-preference" } });
+
 for (const width of [320, 390, 768, 820, 1024, 1440]) {
   for (const theme of ["light", "dark"]) {
     test(`E2E-085/${width}/${theme} branding and controls fit the viewport`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`/?scoutTheme=${theme}`);
+      expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(false);
       await expect(page.locator("#event-search")).toBeVisible();
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       await expect(page.locator(".site-header")).toContainText("Microsoft Events Guide");
@@ -21,6 +24,8 @@ for (const width of [320, 390, 768, 820, 1024, 1440]) {
       await page.keyboard.press("Escape");
       await page.getByRole("button", { name: "Save DEV200", exact: true }).click();
       await expect(page.locator("#nav-saved-count")).toHaveText("1");
+      await expect(page.locator("#toast")).toBeVisible();
+      await expect(page.locator("#toast")).toHaveCSS("pointer-events", "none");
       await page.getByRole("button", { name: "Add DEV200 to custom guide", exact: true }).click();
       await expect(page.locator("#draft-steps textarea")).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

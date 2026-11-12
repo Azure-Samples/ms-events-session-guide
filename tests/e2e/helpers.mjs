@@ -78,7 +78,8 @@ async function attachRuntime(context, testInfo, diagnostics, label = 'browser') 
     case: testInfo.title, project: testInfo.project.name, browser: context.browser()?.browserType().name(),
     browserVersion: context.browser()?.version(),
     viewport: pages.find((page) => !page.isClosed())?.viewportSize() || use.viewport, timezone: use.timezoneId,
-    locale: use.locale, colorScheme: use.colorScheme, mobile: use.isMobile || false,
+    locale: use.locale, colorScheme: use.colorScheme, reducedMotion: use.contextOptions?.reducedMotion,
+    mobile: use.isMobile || false,
     baseURL: use.baseURL, outcome: testInfo.status, build,
     pages: pages.map((page) => page.url()),
   };
@@ -92,8 +93,8 @@ async function attachRuntime(context, testInfo, diagnostics, label = 'browser') 
 }
 
 export const test = base.extend({
-  browserObservations: [async ({ context, timezoneId, viewport, colorScheme, locale, isMobile }, use, testInfo) => {
-    effectiveOptions.set(testInfo, { ...testInfo.project.use, timezoneId, viewport, colorScheme, locale, isMobile });
+  browserObservations: [async ({ context, contextOptions, timezoneId, viewport, colorScheme, locale, isMobile }, use, testInfo) => {
+    effectiveOptions.set(testInfo, { ...testInfo.project.use, contextOptions, timezoneId, viewport, colorScheme, locale, isMobile });
     const problems = observeContext(context);
     const diagnostics = collectDiagnostics(context);
     await guardTelemetry(context, problems);
@@ -162,6 +163,7 @@ export async function addSession(page, fact, { day = '', dialog = false } = {}) 
   } else {
     await session.getByRole('button', { name: `Add ${fact.code} to custom guide`, exact: true }).click();
   }
+  await expect(card(page, fact.code).locator('.card-guide-button')).toHaveAttribute('aria-pressed', 'true');
 }
 
 async function stored(page, event, kind) {
@@ -280,7 +282,7 @@ export async function expectShared(page, expected = GOLDEN) {
 
 export async function recipientContext(browser, testInfo, run) {
   const use = effectiveOptions.get(testInfo) || testInfo.project.use;
-  const options = { acceptDownloads: true };
+  const options = { ...use.contextOptions, acceptDownloads: true };
   for (const key of ['baseURL', 'viewport', 'screen', 'isMobile', 'hasTouch', 'userAgent',
     'deviceScaleFactor', 'locale', 'timezoneId', 'colorScheme']) {
     if (use[key] !== undefined) options[key] = use[key];

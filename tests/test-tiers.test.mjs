@@ -17,6 +17,7 @@ test("smoke is Chromium-only and cannot overwrite full-suite evidence", () => {
   assert.equal(smoke.webServer.reuseExistingServer, false);
   assert.equal(full.webServer.reuseExistingServer, false);
   assert.equal(smoke.retries, 0);
+  assert.equal(full.use.contextOptions.reducedMotion, "reduce");
 });
 
 function discover(config) {
@@ -69,7 +70,20 @@ test("full matrix runs only on demand without deployment privileges", async () =
   const triggers = workflow.split(/^on:\s*$/m)[1]?.split(/^permissions:/m)[0];
   assert.equal(triggers?.trim(), "workflow_dispatch:");
   assert.match(workflow, /run: npm run test:e2e:full/);
-  assert.match(workflow, /npx playwright install --with-deps chromium firefox webkit/);
   assert.match(workflow, /contents: read/);
   assert.doesNotMatch(workflow, /pages: write|id-token: write|deploy-pages|pull_request_target/);
+});
+
+test("hosted full coverage isolates projects and bounds browser workers per runner", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/e2e.yml", import.meta.url), "utf8");
+  const projects = [...workflow.matchAll(/- project: (\S+)\n\s+browser: (\S+)/g)]
+    .map(([, project, browser]) => ({ project, browser }));
+  assert.deepEqual(projects, full.projects.map((project) => ({
+    project: project.name, browser: project.use.defaultBrowserType,
+  })));
+  assert.match(workflow, /fail-fast: false/);
+  assert.match(workflow, /npx playwright install --with-deps \$\{\{ matrix\.browser \}\}/);
+  assert.match(workflow, /--project=\$\{\{ matrix\.project \}\} --workers=2/);
+  assert.match(workflow, /name: e2e-full-\$\{\{ matrix\.project \}\}-\$\{\{ github\.run_id \}\}/);
+  assert.match(workflow, /if: matrix\.project == 'chromium'\n\s+run: npm test/);
 });

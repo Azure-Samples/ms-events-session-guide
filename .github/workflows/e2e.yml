@@ -17,7 +17,22 @@ env:
 jobs:
   regression:
     runs-on: ubuntu-24.04
+    name: Full regression (${{ matrix.project }})
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: chromium
+            browser: chromium
+          - project: firefox
+            browser: firefox
+          - project: webkit
+            browser: webkit
+          - project: mobile-chromium
+            browser: chromium
+          - project: mobile-webkit
+            browser: webkit
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -44,20 +59,21 @@ jobs:
           echo "$RUNNER_TEMP/hugo-bin" >> "$GITHUB_PATH"
 
       - name: Run code-level unit and regression tests
+        if: matrix.project == 'chromium'
         run: npm test
 
-      - name: Install cross-browser engines
-        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Install the selected browser engine
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run full desktop and mobile browser regression
         id: browsers
-        run: npm run test:e2e:full
+        run: npm run test:e2e:full -- --project=${{ matrix.project }} --workers=2
 
       - name: Retain full reports and browser evidence
         if: always() && steps.browsers.outcome != 'skipped'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: e2e-full-${{ github.run_id }}
+          name: e2e-full-${{ matrix.project }}-${{ github.run_id }}
           path: |
             playwright-report/
             test-results/

@@ -47,6 +47,10 @@ For the full matrix, first run `npx playwright install chromium firefox webkit`.
 GitHub Actions runs code regressions plus smoke on PRs and main pushes; the full
 workflow runs only through manual dispatch, for example before merge or release.
 There is no recurring schedule.
+The manual workflow isolates the five browser projects on separate runners with
+two workers each, retaining a separate report artifact for each project.
+Functional journeys use reduced motion to avoid scrolling-animation races;
+responsive presentation checks retain normal motion.
 
 The runner builds isolated, telemetry-free fixtures and owns `127.0.0.1:1414`;
 leave that port free and run browser tiers sequentially. Smoke builds only the

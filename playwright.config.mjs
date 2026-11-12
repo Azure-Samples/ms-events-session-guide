@@ -20,6 +20,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:1414",
     timezoneId: "America/New_York",
     colorScheme: "light",
+    contextOptions: { reducedMotion: "reduce" },
     acceptDownloads: true,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

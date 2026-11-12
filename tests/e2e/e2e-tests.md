@@ -21,6 +21,9 @@ The full matrix remains `npm run test:e2e:full` (or `npm run test:e2e`), after
 are prerequisites. GitHub Actions runs code regressions and smoke for PRs/main
 pushes, and the full matrix only by manual workflow dispatch before merge or
 release. There is no recurring schedule.
+Functional journeys use reduced motion; the responsive presentation variants
+retain normal motion. The manual workflow isolates projects on separate runners
+with two workers each and retains per-project reports.
 The runner
 builds fixture sites and owns `127.0.0.1:1414` for the run, without reusing a
 possibly stale server. `npm run test:e2e:chromium` runs only desktop Chromium.
