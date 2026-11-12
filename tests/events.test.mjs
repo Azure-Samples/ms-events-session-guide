@@ -7,7 +7,7 @@ import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
   eventDestination, eventLocalDate, eventStatus, legacyRouteKind, LEGACY_QUERY_PARAMETERS,
-  resolveLegacyRoute, searchEvents, selectHighlights, validateManifest, wireEventLinks, preserveThemeForSiteLinks,
+  resolveLegacyRoute, searchEvents, selectHighlights, validateManifest, wireEventLinks, wireEventSwitcher, preserveThemeForSiteLinks,
 } from "../assets/js/events.js";
 import { decodeGuide, encodeGuide, getGuideEventId } from "../assets/js/guides.js";
 
@@ -325,6 +325,51 @@ test("event links report observed selections without blocking navigation", () =>
   assert.deepEqual(Object.keys(root.handlers), []);
 });
 
+test("event switcher dismisses outside clicks and focus, but preserves inside interactions", () => {
+  const root = fakeRoot();
+  const summary = {};
+  const option = {};
+  const switcher = { open: true, contains: (target) => target === summary || target === option };
+  root.querySelectorAll = () => [switcher];
+  const dispose = wireEventSwitcher(root);
+  root.handlers.click({ target: summary });
+  assert.equal(switcher.open, true, "summary keeps native toggle behavior");
+  root.handlers.click({ target: option });
+  assert.equal(switcher.open, true, "inside clicks are not intercepted");
+  root.handlers.focusin({ target: summary });
+  assert.equal(switcher.open, true);
+  root.handlers.click({ target: {} });
+  assert.equal(switcher.open, false, "clicking elsewhere closes the dropdown");
+  switcher.open = true;
+  root.handlers.focusin({ target: {} });
+  assert.equal(switcher.open, false, "tabbing away closes the dropdown");
+  dispose();
+  assert.deepEqual(Object.keys(root.handlers), []);
+});
+
+test("Escape closes the event switcher and returns focus without intercepting unrelated keys", () => {
+  const root = fakeRoot();
+  let focused = 0;
+  let prevented = 0;
+  const switcher = {
+    open: true,
+    querySelector: () => ({ focus: () => { focused++; } }),
+  };
+  root.querySelectorAll = () => [switcher];
+  wireEventSwitcher(root);
+  const key = (name) => ({ key: name, preventDefault: () => { prevented++; } });
+  root.handlers.keydown(key("Enter"));
+  assert.equal(switcher.open, true);
+  assert.equal(prevented, 0);
+  root.handlers.keydown(key("Escape"));
+  assert.equal(switcher.open, false);
+  assert.equal(focused, 1);
+  assert.equal(prevented, 1);
+  root.handlers.keydown(key("Escape"));
+  assert.equal(focused, 1, "closed dropdown does not steal focus");
+  assert.equal(prevented, 1, "closed dropdown does not consume Escape");
+});
+
 // ---- Hugo build checks (skipped when Hugo is not installed) ----
 
 const hugoAvailable = spawnSync("hugo", ["version"], { encoding: "utf8" }).status === 0;
@@ -390,6 +435,21 @@ test("production build publishes Ignite only, unchanged, with no raw resources",
   assert.doesNotMatch(home, /telemetry-config|cookie-banner|privacy-settings/);
   assert.doesNotMatch(home, /data\/events\/ignite-2026\/catalog/, "discovery must not reference session catalogs");
   const page = await readFile(`${out}/events/ignite-2026/index.html`, "utf8");
+  for (const html of [home, page]) {
+    assert.equal(html.match(/class="brand devex-brand"/g)?.length, 2, "shared masthead and footer");
+    assert.match(html, /DevEx Center of Excellence/);
+    assert.match(html, /<figure class=devex-hero-art aria-hidden=true>/);
+    assert.doesNotMatch(html, /Rise from friction|<figcaption/);
+    assert.match(html, /<strong>Microsoft Events Guide<\/strong>\s*<span class=devex-brand-team>/);
+    const artwork = [...html.matchAll(/src="?(\/images\/devex\/[^"\s>]+\.webp)"?/g)].map((match) => match[1]);
+    assert.equal(artwork.length, 3, "optimized mark in masthead/footer and one hero illustration");
+    for (const url of artwork) assert.ok((await files(out)).includes(url.slice(1)), `published artwork ${url}`);
+    const favicon = html.match(/<link rel=icon href="?([^"\s>]+\.png)/)?.[1];
+    assert.ok(favicon, "browser tab uses a generated PNG phoenix icon");
+    assert.ok((await files(out)).includes(favicon.slice(1)), "favicon is published");
+    assert.match(html, /sizes=32x32 type=image\/png/);
+    assert.doesNotMatch(html, /favicon\.svg|\.pptx|\.mp4|\.webm|images\/devex\/phoenix(?:-mark)?\.png/);
+  }
   for (const id of ["guide", "catalog", "my-guide", "agenda", "timezone", "path-options", "session-dialog",
     "share-guide", "export-calendar", "load-error", "app-content"]) {
     assert.match(page, new RegExp(`id=${id}[ >]`), `event page keeps #${id}`);

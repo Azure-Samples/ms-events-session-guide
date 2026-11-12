@@ -15,10 +15,7 @@
   {{- end }}
   <header class="site-header">
     <div class="header-inner container">
-      <a class="brand" href="{{ site.Home.RelPermalink }}" aria-label="Events Guide home">
-        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-        <span>events<span class="brand-divider">/</span><strong>guide</strong></span>
-      </a>
+      {{ partial "devex-brand.html" . }}
       <nav class="main-nav" aria-label="Main navigation">
         <a href="#events">All events</a>
       </nav>
@@ -28,10 +25,13 @@
     </div>
   </header>
   <main id="main">
-    <section id="top" class="directory-hero container" aria-labelledby="directory-title">
-      <p class="eyebrow"><span class="live-dot"></span> Events Guide <span class="eyebrow-divider">/</span> Independent session guides</p>
-      <h1 id="directory-title">Find your event.<span>Plan your <em>next move.</em></span></h1>
-      <p class="hero-description">Pick an event to get <strong>curated session paths, a searchable catalog, and a guide you can share.</strong> Each event keeps its own agenda and drafts in this browser.</p>
+    <section id="top" class="directory-hero devex-hero container" aria-labelledby="directory-title">
+      <div class="devex-hero-copy">
+        <p class="eyebrow"><span class="live-dot"></span> Built for builders <span class="eyebrow-divider">/</span> Independent session guides</p>
+        <h1 id="directory-title">Find your event.<span>Plan your <em>next move.</em></span></h1>
+        <p class="hero-description">Pick an event to get <strong>curated session paths, a searchable catalog, and a guide you can share.</strong> Each event keeps its own agenda and drafts in this browser.</p>
+      </div>
+      {{ partial "devex-phoenix.html" . }}
     </section>
 
     <div id="route-status" class="loading-notice container" role="status" hidden></div>

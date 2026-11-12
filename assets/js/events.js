@@ -190,6 +190,32 @@ export function wireEventLinks(root, getTelemetry) {
   };
 }
 
+export function wireEventSwitcher(root) {
+  const switchers = [...root.querySelectorAll(".event-switcher details")];
+  const dismissOutside = (event) => {
+    for (const switcher of switchers) {
+      if (switcher.open && !switcher.contains(event.target)) switcher.open = false;
+    }
+  };
+  const dismissEscape = (event) => {
+    if (event.key !== "Escape") return;
+    for (const switcher of switchers) {
+      if (!switcher.open) continue;
+      switcher.open = false;
+      event.preventDefault();
+      switcher.querySelector("summary").focus();
+    }
+  };
+  root.addEventListener("click", dismissOutside, true);
+  root.addEventListener("focusin", dismissOutside);
+  root.addEventListener("keydown", dismissEscape);
+  return () => {
+    root.removeEventListener("click", dismissOutside, true);
+    root.removeEventListener("focusin", dismissOutside);
+    root.removeEventListener("keydown", dismissEscape);
+  };
+}
+
 export function preserveThemeForSiteLinks(root, location) {
   const theme = new URLSearchParams(location.search).get("scoutTheme");
   if (!["light", "dark"].includes(theme)) return;

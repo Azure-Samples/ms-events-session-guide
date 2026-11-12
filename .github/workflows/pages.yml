@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install pinned browser SDK dependencies
+      - name: Install pinned dependencies
         run: npm ci
 
       - name: Preserve published event identities
@@ -55,8 +55,24 @@ jobs:
           tar -xzf "hugo_${HUGO_VERSION}_linux-amd64.tar.gz" -C "$RUNNER_TEMP/hugo-bin" hugo
           echo "$RUNNER_TEMP/hugo-bin" >> "$GITHUB_PATH"
 
-      - name: Run model and sharing tests
+      - name: Run code-level unit and regression tests
         run: npm test
+
+      - name: Install Chromium for critical browser journeys
+        run: npx playwright install --with-deps chromium
+
+      - name: Run critical browser smoke tests
+        id: smoke
+        run: npm run test:e2e:smoke
+
+      - name: Retain smoke reports and browser evidence
+        if: always() && steps.smoke.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-smoke-${{ github.run_id }}
+          path: test-results/e2e-smoke*
+          retention-days: 7
+          if-no-files-found: error
 
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

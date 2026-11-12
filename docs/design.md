@@ -10,6 +10,23 @@ The directory loads a small event manifest, not every session catalog. Each even
 
 Drafts and agendas are isolated by event and browser origin. Shared guides are validated snapshots carried in URLs; the site stores no guide database. Session text and personal notes are rendered as text, never executable HTML.
 
+## End-to-end testing
+
+The end-user Playwright test specification lives in
+[`tests/e2e/e2e-tests.md`](../tests/e2e/e2e-tests.md), with independent reviews
+under `tests/e2e/reviews/`. Runnable tests accompany the specification.
+`npm run test:pr` combines direct-code regressions with critical Chromium
+journeys; `npm run test:e2e:full` runs the full desktop/mobile browser matrix.
+GitHub Actions uses the fast gate for PRs and full coverage nightly or manually.
+Calendar downloads are checked independently; actual calendar-client imports
+remain blocked pending authorized client access.
+
+## DevEx branding
+
+The site uses the transparent phoenix illustration and icon mark from the supplied `DevEx-CoE-Brand.pptx`. Only those two artwork files are included in `assets/images/devex/`; the source presentation, meeting backgrounds, and videos are not published. Hugo generates responsive, fingerprinted WebP images and a cropped 32px PNG phoenix favicon. Shared brand/hero partials and `assets/css/devex.css` apply a compact inline masthead, faceted cards, and local Segoe UI/Cascadia Code font stacks while preserving the existing light/dark theme colors. The DevEx name sits beside "Microsoft Events Guide" in smaller text; no brand tagline is shown. No external fonts or animated assets are loaded.
+
+The event switcher uses native disclosure behavior. Clicking or moving keyboard focus outside closes it; Escape closes it and restores focus to "Switch event." Event links keep their normal navigation behavior.
+
 ## Event links
 
 Direct event paths such as `/events/ignite-2026/` remain the canonical entry points. A root link with `?event=ignite-2026` opens that published event and consumes the `event` selector, so the resulting URL is `/events/ignite-2026/`, not `/events/ignite-2026/?event=ignite-2026`. Other query parameters and the fragment, including filters, theme, and shared-guide tokens, are preserved without re-encoding. This also works when the site is deployed under a repository subpath.

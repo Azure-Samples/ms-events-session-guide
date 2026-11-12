@@ -433,6 +433,7 @@ FodyWeavers.xsd
 /.hugo_build.lock
 /.DS_Store
 /test-results/
+/playwright-report/
 /.playwright-mcp/
 
 # Unused local speaker export; the app uses per-event bundle catalogs

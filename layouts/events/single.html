@@ -22,10 +22,7 @@
   {{- end }}
   <header class="site-header">
     <div class="header-inner container">
-      <a class="brand" href="{{ site.Home.RelPermalink }}" aria-label="Events Guide: all events">
-        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-        <span>events<span class="brand-divider">/</span><strong>guide</strong></span>
-      </a>
+      {{ partial "devex-brand.html" . }}
       <nav class="main-nav" aria-label="Main navigation">
         <a href="#guide">Your path</a>
         <a href="#catalog">Session catalog</a>
@@ -40,12 +37,13 @@
   {{ partial "events/switcher.html" (dict "current" $event "manifest" $manifest) }}
   <main id="main">
     <section id="top" class="journey-hero container" aria-label="Choose your {{ $event.name }} journey">
-      <div class="journey-intro">
-        <div>
+      <div class="journey-intro devex-hero">
+        <div class="devex-hero-copy">
           <p class="eyebrow"><span class="live-dot"></span> {{ $event.name }} <span class="eyebrow-divider">/</span> An independent guide</p>
           <h1>Your {{ $event.name }}.<span>Your <em>next move.</em></span></h1>
+          <p class="hero-description">Know <strong>what to attend, why it matters, and in what order.</strong> Start with a curated journey, or build a guide your team can share.</p>
         </div>
-        <p class="hero-description">Know <strong>what to attend, why it matters, and in what order.</strong> Start with a curated journey, or build a guide your team can share.</p>
+        {{ partial "devex-phoenix.html" . }}
       </div>
       <div class="journey-choices">
         {{ partial "events/journey-entries.html" (dict "guide" $catalog.guide) }}
