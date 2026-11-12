@@ -1,6 +1,7 @@
 name: Full browser regression
 
 on:
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -17,7 +18,7 @@ env:
 jobs:
   regression:
     runs-on: ubuntu-24.04
-    name: Full regression (${{ matrix.project }})
+    name: Browser E2E (${{ matrix.project }})
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -59,7 +60,7 @@ jobs:
           echo "$RUNNER_TEMP/hugo-bin" >> "$GITHUB_PATH"
 
       - name: Run code-level unit and regression tests
-        if: matrix.project == 'chromium'
+        if: matrix.project == 'chromium' && github.event_name == 'workflow_dispatch'
         run: npm test
 
       - name: Install the selected browser engine

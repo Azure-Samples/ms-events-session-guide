@@ -19,10 +19,11 @@ the full suite, not a second simplified implementation.
 The full matrix remains `npm run test:e2e:full` (or `npm run test:e2e`), after
 `npx playwright install chromium firefox webkit`. Hugo 0.159.1+ and Node.js 22+
 are prerequisites. GitHub Actions runs code regressions and smoke for PRs/main
-pushes, and the full matrix only by manual workflow dispatch before merge or
-release. There is no recurring schedule.
+pushes, and the full matrix automatically on PRs or by manual workflow dispatch
+before release. The five `Browser E2E` jobs report directly in PR checks, without
+manually posted statuses. There is no recurring schedule.
 Functional journeys use reduced motion; the responsive presentation variants
-retain normal motion. The manual workflow isolates projects on separate runners
+retain normal motion. The full workflow isolates projects on separate runners
 with two workers each and retains per-project reports.
 The runner
 builds fixture sites and owns `127.0.0.1:1414` for the run, without reusing a
