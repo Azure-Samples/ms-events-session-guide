@@ -430,6 +430,14 @@ async function readJSON(dir, pattern) {
   return JSON.parse(await readFile(`${dir}/${match}`, "utf8"));
 }
 
+function assertSourceCodeFooter(html) {
+  const footer = /<footer\b[^>]*>([\s\S]*?)<\/footer>/.exec(html)?.[1];
+  assert.ok(footer, "page includes the shared footer");
+  assert.equal(footer.match(/href=https:\/\/github\.com\/Azure-Samples\/ms-events-session-guide[ >]/g)?.length, 1);
+  assert.match(footer, /<a class=text-link href=https:\/\/github\.com\/Azure-Samples\/ms-events-session-guide target=_blank rel="noopener noreferrer"><svg class="icon" aria-hidden="true"><use href="#i-github"\/><\/svg>Source code<\/a>/);
+  assert.match(html, /<symbol id="i-github" viewBox="0 0 24 24">/);
+}
+
 test("production build publishes Ignite only, unchanged, with no raw resources", { skip: !hugoAvailable }, async () => {
   const out = `${buildRoot}/production`;
   await rm(out, { recursive: true, force: true });
@@ -469,6 +477,7 @@ test("production build publishes Ignite only, unchanged, with no raw resources",
   assert.match(page, /href=https:\/\/aka\.ms\/MSIgniteFY27RegNow target=_blank rel="noopener noreferrer"/);
   assert.match(page, /Saving sessions here does not register you for the event or reserve a session seat/);
   for (const html of [home, page]) {
+    assertSourceCodeFooter(html);
     assert.equal(html.match(/class="brand devex-brand"/g)?.length, 2, "shared masthead and footer");
     assert.match(html, /DevEx Center of Excellence/);
     assert.match(html, /<figure class=devex-hero-art aria-hidden=true>/);
@@ -531,6 +540,7 @@ test("fixture build supports two events, reused IDs, novel audiences, and reposi
     assert.match(home, /Fixture preview/);
     assert.doesNotMatch(home, /<\/script><b>/);
     const page = await readFile(`${out}/events/fabrikam-summit-2027/index.html`, "utf8");
+    for (const html of [home, page]) assertSourceCodeFooter(html);
     assert.doesNotMatch(page, /id=event-registration[ >]/);
     assert.match(page, /data-audience=public-sector aria-pressed=true>Public sector</);
     assert.match(page, /class=audience-control hidden/);
