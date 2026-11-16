@@ -3,6 +3,7 @@
   {{ partial "devex-brand.html" . }}
   <p>For the teams building what comes next. An independent guide; not official event guidance.</p>
   <div class="footer-actions">
+    <a class="text-link" href="https://github.com/Azure-Samples/ms-events-session-guide" target="_blank" rel="noopener noreferrer"><svg class="icon" aria-hidden="true"><use href="#i-github"></use></svg>Source code</a>
     {{- $notices := resources.FromString "third-party-notices.txt" (os.ReadFile "NOTICE") }}
     <a class="text-link" href="{{ $notices.RelPermalink }}">Third-party notices</a>
     {{- $privacy := resources.FromString "privacy.txt" (os.ReadFile "PRIVACY") }}
